@@ -1,0 +1,81 @@
+<!--
+  BARVY ZNAČKY KONZOLÁK
+  Celé téma se přebarví změnou těchto šesti hodnot. Barvy převzaty z webu servis.konzolak.com (navy + zlatá),
+  logo je v Assets/logo.png.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Color x:Key="BarvaPozadi">#FF0F2038</Color>
+  <Color x:Key="BarvaPanel">#FF0B1A30</Color>
+  <Color x:Key="BarvaText">#FFF1F3F7</Color>
+  <Color x:Key="BarvaTextTlumeny">#FF8C9AB3</Color>
+  <Color x:Key="BarvaAkcent">#FFC8992E</Color>   <!-- hlavní barva značky -->
+  <Color x:Key="BarvaVarovani">#FFF59E0B</Color>
+  <Color x:Key="BarvaChyba">#FFEF4444</Color>
+  <Color x:Key="BarvaOk">#FF22C55E</Color>
+
+  <SolidColorBrush x:Key="Pozadi" Color="{StaticResource BarvaPozadi}"/>
+  <SolidColorBrush x:Key="Panel" Color="{StaticResource BarvaPanel}"/>
+  <SolidColorBrush x:Key="Text" Color="{StaticResource BarvaText}"/>
+  <SolidColorBrush x:Key="TextTlumeny" Color="{StaticResource BarvaTextTlumeny}"/>
+  <SolidColorBrush x:Key="Akcent" Color="{StaticResource BarvaAkcent}"/>
+  <SolidColorBrush x:Key="Varovani" Color="{StaticResource BarvaVarovani}"/>
+  <SolidColorBrush x:Key="Chyba" Color="{StaticResource BarvaChyba}"/>
+  <SolidColorBrush x:Key="Ok" Color="{StaticResource BarvaOk}"/>
+
+  <FontFamily x:Key="Pismo">Segoe UI</FontFamily>
+  <FontFamily x:Key="PismoKonzole">Cascadia Mono, Consolas</FontFamily>
+
+  <Style TargetType="Button" x:Key="TlacitkoAkce">
+    <Setter Property="Background" Value="{StaticResource Panel}"/>
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Akcent}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="14,10"/>
+    <Setter Property="Margin" Value="0,0,10,10"/>
+    <Setter Property="MinWidth" Value="200"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="b" Property="Background" Value="{StaticResource Akcent}"/>
+              <Setter Property="Foreground" Value="{StaticResource Panel}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="RadioButton" x:Key="PolozkaMenu">
+    <Setter Property="Foreground" Value="{StaticResource TextTlumeny}"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Border x:Name="b" Padding="20,12" Background="Transparent" BorderThickness="4,0,0,0" BorderBrush="Transparent">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource Akcent}"/>
+              <Setter TargetName="b" Property="Background" Value="{StaticResource Pozadi}"/>
+              <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>
