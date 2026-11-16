@@ -63,28 +63,21 @@ public static class ServisniKatalog
 
         // ---------- DISKY ----------
         new() {
-            Nazev = "Zdraví disků (SMART)", Kategorie = Kategorie.Disky,
-            Popis = "Stav, teplota, opotřebení a chyby čtení všech fyzických disků.",
-            Spustit = async (log, ct) => Z(await ProcessRunner.PowerShellAsync(
-                "Get-PhysicalDisk | ForEach-Object { $r = $_ | Get-StorageReliabilityCounter; " +
-                "'{0} ({1}) – stav: {2}, teplota: {3} °C, opotřebení: {4} %, chyby čtení: {5}, hodin v provozu: {6}' -f " +
-                "$_.FriendlyName,$_.MediaType,$_.HealthStatus,$r.Temperature,$r.Wear,$r.ReadErrorsTotal,$r.PowerOnHours }",
-                log, ct), "SMART načten", "SMART nelze načíst") },
+            Nazev = "Kvalita a zdraví disků", Kategorie = Kategorie.Disky,
+            Popis = "Skóre 0–100 pro každý disk: SMART srozumitelně, teplota, opotřebení, vadné sektory a doporučení.",
+            Spustit = async (log, ct) => Vysl(await DiskService.KvalitaAsync(log, ct)) },
         new() {
-            Nazev = "Kontrola systémového disku (online)", Kategorie = Kategorie.Disky,
-            Popis = "chkdsk /scan – kontrola souborového systému bez restartu.",
-            Spustit = async (log, ct) => Z(await ProcessRunner.RunAsync("chkdsk.exe", $"{Sys} /scan", log, ct),
-                "Disk bez chyb", "Nalezeny chyby – doporučena oprava") },
+            Nazev = "Test povrchu (jen čtení)", Kategorie = Kategorie.Disky,
+            Popis = "Projde povrch disku a ukáže mapu bloků – vadné a pomalé oblasti. Rychlý nebo úplný režim. Nic nezapisuje.",
+            Spustit = DiskService.TestPovrchuAsync },
         new() {
-            Nazev = "Oprava systémového disku při restartu", Kategorie = Kategorie.Disky, MeniSystem = true,
-            Varovani = "Oprava proběhne při příštím restartu a může trvat i desítky minut.",
-            Popis = "Označí disk ke kontrole a opravě (chkdsk /f) při dalším startu.",
-            Spustit = async (log, ct) => {
-                // fsutil místo „echo A| chkdsk“ – funguje v každém jazyce Windows (A/Y/J…)
-                var rc = await ProcessRunner.RunAsync("fsutil.exe", $"dirty set {Sys}", log, ct);
-                return rc == 0 ? new(Stav.Info, "Oprava naplánována na příští restart")
-                               : new(Stav.Chyba, $"Opravu se nepodařilo naplánovat (kód {rc})");
-            }},
+            Nazev = "Rychlost disku (benchmark)", Kategorie = Kategorie.Disky,
+            Popis = "Rychlost čtení a zápisu, přístupová doba a porovnání s tím, co je u daného typu disku obvyklé.",
+            Spustit = DiskService.BenchmarkAsync },
+        new() {
+            Nazev = "Kontrola a oprava disků (chkdsk)", Kategorie = Kategorie.Disky,
+            Popis = "Zkontroluje souborový systém všech jednotek a čitelně vypíše výsledek. Oprava jen po potvrzení.",
+            Spustit = async (log, ct) => Vysl(await DiskService.ChkdskAsync(log, ct)) },
         new() {
             Nazev = "Optimalizace / defragmentace", Kategorie = Kategorie.Disky, MeniSystem = true,
             Popis = "SSD: TRIM, HDD: defragmentace. Windows sám pozná typ disku.",

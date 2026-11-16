@@ -15,6 +15,9 @@ public sealed record Radek(string Popis, string Hodnota = "", Stav? Stav = null,
     public IReadOnlyList<AkceRadku> Akce { get; init; } = Array.Empty<AkceRadku>();
 }
 
+/// <summary>Jeden čtvereček mapy povrchu disku: stav a popisek (oblast, doba čtení).</summary>
+public sealed record BunkaMapy(Stav Stav, string Popis);
+
 public sealed class SekceZpravy
 {
     public SekceZpravy(string nadpis) => Nadpis = nadpis;
@@ -23,6 +26,8 @@ public sealed class SekceZpravy
     /// <summary>Sekce se zobrazí sbalená – rozbalí se kliknutím na nadpis.</summary>
     public bool Sbalena { get; set; }
     public List<Radek> Radky { get; } = new();
+    /// <summary>Volitelná mapa bloků (test povrchu disku) – barevné čtverečky.</summary>
+    public IReadOnlyList<BunkaMapy>? Mapa { get; set; }
     public SekceZpravy Pridej(string popis, string hodnota = "", Stav? stav = null, string detail = "",
         params AkceRadku[] akce)
     {

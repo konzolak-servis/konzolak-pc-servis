@@ -30,6 +30,15 @@ public static class ZpravaExport
         foreach (var s in z.Sekce)
         {
             sb.AppendLine().AppendLine(s.Nadpis.ToUpperInvariant()).AppendLine(new string('-', 60));
+            if (s.Mapa != null)
+            {
+                sb.AppendLine("Legenda: # v pořádku, ~ pomalé, X chyba čtení, . netestováno");
+                for (var i = 0; i < s.Mapa.Count; i += 50)
+                    sb.AppendLine(string.Concat(s.Mapa.Skip(i).Take(50).Select(b => b.Stav switch
+                    {
+                        Models.Stav.Ok => '#', Models.Stav.Varovani => '~', Models.Stav.Chyba => 'X', _ => '.'
+                    })));
+            }
             foreach (var r in s.Radky)
             {
                 var st = r.Stav is null ? "" : $"[{StavText(r.Stav)}] ";
@@ -75,7 +84,17 @@ public static class ZpravaExport
             """);
         foreach (var s in z.Sekce)
         {
-            sb.Append($"<h2>{E(s.Nadpis)}</h2><table>");
+            sb.Append($"<h2>{E(s.Nadpis)}</h2>");
+            if (s.Popis.Length > 0) sb.Append($"<div class=\"det\" style=\"margin-bottom:8px\">{E(s.Popis)}</div>");
+            if (s.Mapa != null)
+            {
+                sb.Append("<div style=\"background:#0B1A30;border-radius:8px;padding:10px;margin-bottom:8px;line-height:0\">");
+                foreach (var b in s.Mapa)
+                    sb.Append($"<span title=\"{E(b.Popis)}\" style=\"display:inline-block;width:12px;height:12px;margin:1px;border-radius:2px;"
+                        + $"background:{Barva(b.Stav)};opacity:{(b.Stav == Models.Stav.Info ? "0.35" : "1")}\"></span>");
+                sb.Append("</div>");
+            }
+            sb.Append("<table>");
             foreach (var r in s.Radky)
             {
                 var det = r.Detail.Length > 0 ? $"<div class=\"det\">{E(r.Detail)}</div>" : "";

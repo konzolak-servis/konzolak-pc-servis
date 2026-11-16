@@ -37,6 +37,7 @@ public partial class MainWindow : Window
         Title = $"Konzolák Servis v{AktualizaceService.VerzeText}";
         VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText}";
         _log.Radek += l => Dispatcher.Invoke(() => { Konzole.AppendText(l + Environment.NewLine); Konzole.ScrollToEnd(); });
+        DiskService.ZivaMapa += (bunky, text) => Dispatcher.InvokeAsync(() => ZivaMapa(bunky, text));
 
         var admin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
         AdminInfo.Text = admin ? "Spuštěno jako správce ✔" : "⚠ Bez práv správce – opravy nebudou fungovat";
@@ -272,6 +273,47 @@ public partial class MainWindow : Window
             Foreground = B("TextTlumeny"), Margin = new Thickness(0, 6, 0, 0) });
     }
 
+    /// <summary>Mapa povrchu disku: mřížka barevných čtverečků (zelená/žlutá/červená/šedá).</summary>
+    private WrapPanel MapaUI(IReadOnlyList<BunkaMapy> bunky, WrapPanel? existujici)
+    {
+        var wp = existujici ?? new WrapPanel { Margin = new Thickness(0, 8, 0, 8) };
+        for (var i = 0; i < bunky.Count; i++)
+        {
+            Rectangle r;
+            if (i < wp.Children.Count) r = (Rectangle)wp.Children[i];
+            else
+            {
+                r = new Rectangle { Width = 12, Height = 12, Margin = new Thickness(1), RadiusX = 2, RadiusY = 2 };
+                wp.Children.Add(r);
+            }
+            var barva = BarvaStavu(bunky[i].Stav);
+            if (!ReferenceEquals(r.Fill, barva)) r.Fill = barva;
+            r.Opacity = bunky[i].Stav == Stav.Info ? 0.35 : 1;
+            if (r.ToolTip as string != bunky[i].Popis) r.ToolTip = bunky[i].Popis;
+        }
+        return wp;
+    }
+
+    private WrapPanel? _zivaMapa;
+    private TextBlock? _zivaMapaText;
+
+    /// <summary>Živé vykreslování mapy během testu povrchu.</summary>
+    private void ZivaMapa(IReadOnlyList<BunkaMapy> bunky, string text)
+    {
+        if (_cts == null) return;
+        if (_zivaMapa == null || !VysledekPanel.Children.Contains(_zivaMapa))
+        {
+            _zivaMapaText = new TextBlock { FontSize = 15, Margin = new Thickness(0, 12, 0, 0), Foreground = B("Akcent") };
+            _zivaMapa = MapaUI(bunky, null);
+            VysledekPanel.Children.Add(_zivaMapaText);
+            VysledekPanel.Children.Add(new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 4, 10, 4), Margin = new Thickness(0, 6, 0, 0), Child = _zivaMapa });
+            ZalozkaVysledek.IsChecked = true;
+        }
+        else MapaUI(bunky, _zivaMapa);
+        _zivaMapaText!.Text = text;
+    }
+
     private void Vykresli(Zprava z)
     {
         VysledekPanel.Children.Clear();
@@ -296,6 +338,7 @@ public partial class MainWindow : Window
         foreach (var s in z.Sekce)
         {
             var tabulka = new StackPanel();
+            if (s.Mapa != null) tabulka.Children.Add(MapaUI(s.Mapa, null));
             foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r, z));
             var obal = new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(12, 4, 12, 4), Child = tabulka, Visibility = s.Sbalena ? Visibility.Collapsed : Visibility.Visible };

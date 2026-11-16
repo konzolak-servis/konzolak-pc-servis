@@ -1,3 +1,12 @@
+## 0.9
+- Disky → Kvalita a zdraví disků: skóre 0–100 pro každý disk (výborný / dobrý / opotřebený / špatný / kritický) s vysvětlením, proč skóre kleslo.
+- SMART srozumitelně: přemapované, nestabilní a neopravitelné sektory, chyby kabelu, teplota, opotřebení SSD, doba provozu, předpověď selhání. Kompletní tabulka atributů SMART s českými názvy a vysvětlením.
+- Doporučení ke každému disku (zálohovat, vyměnit kabel, chladit, vyměnit HDD za SSD…).
+- Test povrchu (jen čtení): rychlý nebo úplný režim, živá mapa bloků během testu (zelená / žlutá pomalé / červená vadné), seznam vadných míst. Test lze kdykoli zastavit.
+- Rychlost disku: sekvenční čtení na 5 místech disku, přístupová doba, zápis do dočasného souboru, porovnání s obvyklou rychlostí daného typu disku.
+- Kontrola a oprava disků (chkdsk): všechny jednotky naráz, čitelný výsledek, vadné sektory, tlačítka opravy (/f, /r, oprava při restartu) – vždy s potvrzením.
+- Mapa povrchu se ukládá i do HTML/TXT výsledku.
+
 ## 0.8
 - Hardware → Výpis zařízení: všechna zařízení po kategoriích jako ve Správci zařízení (Baterie, Bluetooth, Klávesnice, Monitory, Síťové adaptéry…), kategorie se rozbalují kliknutím.
 - U každého zařízení výrobce, ovladač (poskytovatel, verze, datum), digitální podpis, INF soubor a ID zařízení.
