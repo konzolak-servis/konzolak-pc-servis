@@ -88,7 +88,7 @@ public static class PrehledService
         var celkem = moduly.Sum(m => Convert.ToDouble(m["Capacity"] ?? 0));
         var prvni = moduly.FirstOrDefault();
         var typ = Convert.ToInt32(prvni?["SMBIOSMemoryType"] ?? 0) switch { 20 => "DDR", 21 => "DDR2", 24 => "DDR3", 26 => "DDR4", 34 => "DDR5", 30 => "LPDDR4", 35 => "LPDDR5", _ => "" };
-        var takt = S(prvni?["ConfiguredClockSpeed"]) is { Length: > 0 } t && t != "0" ? t : S(prvni?["Speed"]);
+        var takt = S(prvni?["ConfiguredClockSpeed"]) is { Length: > 0 } tk && tk != "0" ? tk : S(prvni?["Speed"]);
         karty.Add(new KartaPrehledu("Operační paměť", $"{Gb(celkem > 0 ? celkem : Convert.ToDouble(cs?["TotalPhysicalMemory"] ?? 0))} {typ}".Trim())
             .R("Moduly", $"{moduly.Count}" + (sloty > 0 ? $" z {sloty} slotů" : "") + (moduly.Count == 1 && sloty > 1 ? " (běží v single-channel)" : ""),
                 moduly.Count == 1 && sloty > 1 ? Stav.Varovani : null)
