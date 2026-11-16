@@ -10,6 +10,8 @@ public static class ServisniKatalog
     /// <summary>Systémový disk – nemusí to být vždy C:.</summary>
     private static string Sys => Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
 
+    private static VysledekAkce Vysl(Zprava z) => new(z.Stav, z.Shrnuti) { Zprava = z };
+
     private static VysledekAkce Z(int rc, string ok, string chyba) =>
         rc == 0 ? new(Stav.Ok, ok) : new(Stav.Chyba, $"{chyba} (kód {rc})");
 
@@ -32,15 +34,23 @@ public static class ServisniKatalog
                 "| ForEach-Object { '{0:dd.MM. HH:mm}  {1}  {2}' -f $_.TimeCreated,$_.ProviderName,($_.Message -split \"`n\")[0] }",
                 log, ct), "Výpis událostí hotov", "Události nelze načíst") },
         new() {
-            Nazev = "Programy po spuštění", Kategorie = Kategorie.Diagnostika,
-            Popis = "Co se spouští s Windows a zpomaluje start.",
-            Spustit = async (log, ct) => Z(await ProcessRunner.PowerShellAsync(
-                "Get-CimInstance Win32_StartupCommand | ForEach-Object { '{0}  ->  {1}' -f $_.Name,$_.Command }",
-                log, ct), "Hotovo", "Nelze zjistit") },
-        new() {
             Nazev = "Zpráva o baterii", Kategorie = Kategorie.Diagnostika,
             Popis = "U notebooků: zdraví baterie, kapacita a počet cyklů.",
             Spustit = BatteryService.ZpravaAsync },
+
+        // ---------- OPTIMALIZACE ----------
+        new() {
+            Nazev = "Programy po spuštění", Kategorie = Kategorie.Optimalizace,
+            Popis = "Co se spouští s Windows: popis, doporučení, vliv na start. Vypnout / zapnout jedním klikem.",
+            Spustit = async (log, ct) => Vysl(await StartupService.ZpravaAsync(log, ct)) },
+        new() {
+            Nazev = "Služby Windows", Kategorie = Kategorie.Optimalizace,
+            Popis = "Zbytečné služby na pozadí (telemetrie, Xbox, fax…) s vysvětlením. Vše vratné.",
+            Spustit = async (log, ct) => Vysl(await SluzbyService.ZpravaAsync(log, ct)) },
+        new() {
+            Nazev = "Výkon a soukromí", Kategorie = Kategorie.Optimalizace,
+            Popis = "Plán napájení, herní nahrávání, vizuální efekty, telemetrie, reklamy ve Windows…",
+            Spustit = async (log, ct) => Vysl(await VykonService.ZpravaAsync(log, ct)) },
 
         // ---------- DISKY ----------
         new() {

@@ -79,7 +79,13 @@ public static class PerfmonReportService
             if (x.Podrobnosti.Length > 0) det.Add($"Podrobnosti: {x.Podrobnosti}");
             if (x.TykaSe.Count > 0) det.Add($"Týká se: {string.Join(", ", x.TykaSe)}");
             if (x.Reseni.Length > 0) det.Add($"Řešení: {x.Reseni}");
-            p.Pridej(x.Priznak, "", x.Zavaznost, string.Join("\n", det));
+            // Náprava: u havarovaných služeb nabídneme restart
+            var akce = x.TykaSe.Where(t => !t.Contains(':') && SluzbyService.Existuje(t))
+                .Select(t => new AkceRadku($"Restartovat službu {t}", (l, c) => SluzbyService.RestartAsync(t, l, c)) { Doporucena = true })
+                .ToList();
+            if (akce.Count > 0)
+                det.Add("Tip: Pokud službu nepotřebujete (např. MapsBroker – offline mapy), omezte ji v sekci Optimalizace → Služby Windows.");
+            p.Pridej(x.Priznak, "", x.Zavaznost, string.Join("\n", det), akce.ToArray());
         }
         if (p.Radky.Count == 0) p.Pridej("Žádné problémy nenalezeny", "", Stav.Ok);
 

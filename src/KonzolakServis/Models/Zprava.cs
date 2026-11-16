@@ -1,16 +1,30 @@
 namespace KonzolakServis.Models;
 
-/// <summary>Jeden řádek výsledku: popis, hodnota, volitelně stav (barevná tečka) a podrobnosti.</summary>
-public sealed record Radek(string Popis, string Hodnota = "", Stav? Stav = null, string Detail = "");
+/// <summary>Tlačítko nápravy u řádku výsledku (např. „Vypnout“, „Vrátit původní“).</summary>
+public sealed record AkceRadku(string Text, Func<IProgress<string>, CancellationToken, Task<string>> Spustit)
+{
+    /// <summary>Před spuštěním se zeptat (změna systému).</summary>
+    public string? Potvrzeni { get; init; }
+    /// <summary>Zvýrazněné tlačítko = doporučená akce.</summary>
+    public bool Doporucena { get; init; }
+}
+
+/// <summary>Jeden řádek výsledku: popis, hodnota, volitelně stav (barevná tečka), podrobnosti a tlačítka nápravy.</summary>
+public sealed record Radek(string Popis, string Hodnota = "", Stav? Stav = null, string Detail = "")
+{
+    public IReadOnlyList<AkceRadku> Akce { get; init; } = Array.Empty<AkceRadku>();
+}
 
 public sealed class SekceZpravy
 {
     public SekceZpravy(string nadpis) => Nadpis = nadpis;
     public string Nadpis { get; }
+    public string Popis { get; set; } = "";
     public List<Radek> Radky { get; } = new();
-    public SekceZpravy Pridej(string popis, string hodnota = "", Stav? stav = null, string detail = "")
+    public SekceZpravy Pridej(string popis, string hodnota = "", Stav? stav = null, string detail = "",
+        params AkceRadku[] akce)
     {
-        Radky.Add(new Radek(popis, hodnota, stav, detail));
+        Radky.Add(new Radek(popis, hodnota, stav, detail) { Akce = akce });
         return this;
     }
 }
@@ -25,6 +39,10 @@ public sealed class Zprava
     public DateTime Cas { get; } = DateTime.Now;
     public string Pocitac { get; } = Environment.MachineName;
     public List<SekceZpravy> Sekce { get; } = new();
+    /// <summary>Tlačítka nad celou zprávou (např. „Použít všechna doporučení“).</summary>
+    public List<AkceRadku> HromadneAkce { get; } = new();
+    /// <summary>Jak zprávu znovu načíst po provedení nápravy (aktuální stav).</summary>
+    public Func<IProgress<string>, CancellationToken, Task<Zprava>>? Obnovit { get; set; }
 
     public SekceZpravy PridejSekci(string nadpis)
     {

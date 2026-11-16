@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private static readonly (Kategorie Kat, string Nazev)[] Sekce =
     {
         (Kategorie.Diagnostika, "Diagnostika"),
+        (Kategorie.Optimalizace, "Optimalizace"),
         (Kategorie.Disky, "Disky"),
         (Kategorie.Opravy, "Opravy systému"),
         (Kategorie.Cisteni, "Čištění"),
@@ -161,19 +162,29 @@ public partial class MainWindow : Window
             Child = new TextBlock { Text = z.Shrnuti, FontSize = 15, TextWrapping = TextWrapping.Wrap }
         });
 
+        if (z.HromadneAkce.Count > 0)
+        {
+            var hp = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+            foreach (var a in z.HromadneAkce) hp.Children.Add(TlacitkoAkce(a, z));
+            VysledekPanel.Children.Add(hp);
+        }
+
         foreach (var s in z.Sekce)
         {
             VysledekPanel.Children.Add(new TextBlock { Text = s.Nadpis, FontSize = 16, FontWeight = FontWeights.SemiBold,
                 Foreground = B("Akcent"), Margin = new Thickness(0, 14, 0, 6) });
+            if (s.Popis.Length > 0)
+                VysledekPanel.Children.Add(new TextBlock { Text = s.Popis, TextWrapping = TextWrapping.Wrap, FontSize = 12.5,
+                    Foreground = B("TextTlumeny"), Margin = new Thickness(0, 0, 0, 6) });
             var tabulka = new StackPanel();
-            foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r));
+            foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r, z));
             VysledekPanel.Children.Add(new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(12, 4, 12, 4), Child = tabulka });
         }
         VysledekScroll.ScrollToTop();
     }
 
-    private UIElement RadekUI(Radek r)
+    private UIElement RadekUI(Radek r, Zprava z)
     {
         var g = new Grid { Margin = new Thickness(0, 6, 0, 6) };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
@@ -191,6 +202,12 @@ public partial class MainWindow : Window
         if (r.Detail.Length > 0)
             levy.Children.Add(new TextBox { Text = r.Detail, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
                 Foreground = B("TextTlumeny"), TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(0, 3, 12, 0) });
+        if (r.Akce.Count > 0)
+        {
+            var tl = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+            foreach (var a in r.Akce) tl.Children.Add(TlacitkoAkce(a, z));
+            levy.Children.Add(tl);
+        }
         Grid.SetColumn(levy, 1);
         g.Children.Add(levy);
 
@@ -202,6 +219,52 @@ public partial class MainWindow : Window
             g.Children.Add(hodnota);
         }
         return g;
+    }
+
+    /// <summary>Tlačítko nápravy: provede akci, zapíše do logu a obnoví zobrazení s aktuálním stavem.</summary>
+    private Button TlacitkoAkce(AkceRadku a, Zprava z)
+    {
+        var b = new Button { Content = a.Text, Style = (Style)FindResource(a.Doporucena ? "TlacitkoNaprava" : "TlacitkoMale"),
+            Margin = new Thickness(0, 0, 8, 4) };
+        b.Click += async (_, _) => await ProvedNapravuAsync(a, z);
+        return b;
+    }
+
+    private async Task ProvedNapravuAsync(AkceRadku a, Zprava z)
+    {
+        if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolák Servis"); return; }
+        if (a.Potvrzeni != null &&
+            MessageBox.Show(a.Potvrzeni, "Konzolák Servis", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        _cts = new CancellationTokenSource();
+        Prubeh.Visibility = Visibility.Visible; Zrusit.IsEnabled = true; Akce.IsEnabled = false; VysledekPanel.IsEnabled = false;
+        StavText.Text = $"Probíhá: {a.Text}…";
+        _log.Zapis($"--- Náprava: {a.Text} ---");
+        var progress = new Progress<string>(_log.Zapis);
+        try
+        {
+            var vysledek = await Task.Run(() => a.Spustit(progress, _cts.Token));
+            _log.Zapis(vysledek);
+            StavText.Text = vysledek;
+            if (z.Obnovit != null)
+            {
+                var nova = await Task.Run(() => z.Obnovit(progress, _cts.Token));
+                _posledni = nova;
+                Vykresli(nova);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Zapis($"CHYBA: {ex.Message}");
+            StavText.Text = "Náprava selhala – podrobnosti v záložce Podrobný log";
+            MessageBox.Show($"Akce se nezdařila:\n{ex.Message}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _cts.Dispose(); _cts = null;
+            Prubeh.Visibility = Visibility.Collapsed; Zrusit.IsEnabled = false; Akce.IsEnabled = true; VysledekPanel.IsEnabled = true;
+        }
     }
 
     // ---------- Tlačítka ----------

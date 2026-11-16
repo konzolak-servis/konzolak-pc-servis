@@ -65,6 +65,13 @@
     <Setter Property="HorizontalContentAlignment" Value="Center"/>
   </Style>
 
+  <!-- Doporučená náprava – zlaté tlačítko -->
+  <Style TargetType="Button" x:Key="TlacitkoNaprava" BasedOn="{StaticResource TlacitkoMale}">
+    <Setter Property="Background" Value="{StaticResource Akcent}"/>
+    <Setter Property="Foreground" Value="{StaticResource Panel}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
   <!-- Záložky Výsledek / Podrobný log -->
   <Style TargetType="RadioButton" x:Key="Zalozka">
     <Setter Property="Foreground" Value="{StaticResource TextTlumeny}"/>
