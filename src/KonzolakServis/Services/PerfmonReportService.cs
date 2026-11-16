@@ -114,15 +114,15 @@ public static class PerfmonReportService
                     k.Pridej(x.Nazev, x.Vysledek, x.Stav, $"{x.Popis}. {coZnamena}");
                     continue;
                 }
-                var pricinyZ = v.Zjisteni.Where(p => x.Priciny.Contains(p.Id)).ToList();
+                var pricinyZ = v.Zjisteni.Where(q => x.Priciny.Contains(q.Id)).ToList();
                 var det = new List<string>();
                 det.Add(pricinyZ.Count > 0
-                    ? "Důvod: " + string.Join("; ", pricinyZ.Select(p => p.TykaSe.Count > 0 ? $"{p.Priznak} ({string.Join(", ", p.TykaSe)})" : p.Priznak))
+                    ? "Důvod: " + string.Join("; ", pricinyZ.Select(q => q.TykaSe.Count > 0 ? $"{q.Priznak} ({string.Join(", ", q.TykaSe)})" : q.Priznak))
                     : "Důvod: Windows ve zprávě konkrétní příčinu neuvedl – podívejte se do sekce Nalezené problémy výše.");
                 det.Add($"Co to znamená: {coZnamena}");
-                foreach (var p in pricinyZ.Where(p => p.Reseni.Length > 0)) det.Add($"Řešení: {p.Reseni}");
+                foreach (var q in pricinyZ.Where(q => q.Reseni.Length > 0)) det.Add($"Řešení: {q.Reseni}");
                 det.Add($"Jak to ověřit: {overit}");
-                var akce = pricinyZ.SelectMany(p => p.TykaSe).Where(t => !t.Contains(':') && SluzbyService.Existuje(t)).Distinct()
+                var akce = pricinyZ.SelectMany(q => q.TykaSe).Where(t => !t.Contains(':') && SluzbyService.Existuje(t)).Distinct()
                     .Select(t => new AkceRadku($"Restartovat službu {t}", (l, c) => SluzbyService.RestartAsync(t, l, c)) { Doporucena = true })
                     .Concat(akceKontroly).ToArray();
                 k.Pridej(x.Nazev, x.Vysledek, x.Stav, string.Join("\n", det), akce);
