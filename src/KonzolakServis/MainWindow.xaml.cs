@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         (Kategorie.Cisteni, "Čištění"),
         (Kategorie.Sit, "Síť"),
         (Kategorie.HwInfo, "Hardware"),
+        (Kategorie.Nastroje, "Nástroje Windows"),
     };
 
     public MainWindow()
@@ -57,9 +58,10 @@ public partial class MainWindow : Window
         {
             var obsah = new StackPanel();
             obsah.Children.Add(new TextBlock { Text = a.Nazev, FontWeight = FontWeights.SemiBold, FontSize = 14 });
-            obsah.Children.Add(new TextBlock { Text = a.Popis, TextWrapping = TextWrapping.Wrap, MaxWidth = 240,
+            obsah.Children.Add(new TextBlock { Text = a.Popis, TextWrapping = TextWrapping.Wrap, MaxWidth = kat == Kategorie.Nastroje ? 200 : 240,
                 Opacity = 0.75, FontSize = 12, Margin = new Thickness(0, 3, 0, 0) });
-            var b = new Button { Content = obsah, Style = (Style)FindResource("TlacitkoAkce"), Width = 270 };
+            var b = new Button { Content = obsah, Style = (Style)FindResource("TlacitkoAkce"),
+                Width = kat == Kategorie.Nastroje ? 230 : 270 };
             b.Click += async (_, _) => await SpustAsync(a);
             Akce.Children.Add(b);
         }

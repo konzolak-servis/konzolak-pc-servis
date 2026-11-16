@@ -52,6 +52,15 @@ public static class ServisniKatalog
             Popis = "Plán napájení, herní nahrávání, vizuální efekty, telemetrie, reklamy ve Windows…",
             Spustit = async (log, ct) => Vysl(await VykonService.ZpravaAsync(log, ct)) },
 
+        new() {
+            Nazev = "Zabezpečení a licence", Kategorie = Kategorie.Diagnostika,
+            Popis = "Antivirus, firewall, aktualizace, UAC, Secure Boot, TPM, BitLocker, aktivace Windows.",
+            Spustit = async (log, ct) => Vysl(await ZabezpeceniService.ZpravaAsync(log, ct)) },
+        new() {
+            Nazev = "Zařízení a ovladače", Kategorie = Kategorie.Diagnostika,
+            Popis = "Zařízení s vykřičníkem ve Správci zařízení – co je špatně a jak to opravit.",
+            Spustit = ZarizeniService.ZpravaAsync },
+
         // ---------- DISKY ----------
         new() {
             Nazev = "Zdraví disků (SMART)", Kategorie = Kategorie.Disky,
@@ -108,6 +117,11 @@ public static class ServisniKatalog
                 "'wuauserv','bits','cryptsvc' | Start-Service; 'Mezipaměť aktualizací vyčištěna.'",
                 log, ct), "Windows Update resetován", "Reset se nezdařil") },
 
+        new() {
+            Nazev = "Záloha ovladačů", Kategorie = Kategorie.Opravy,
+            Popis = "Uloží všechny nainstalované ovladače do složky – hodí se před reinstalací Windows.",
+            Spustit = ZarizeniService.ZalohaOvladacuAsync },
+
         // ---------- ČIŠTĚNÍ ----------
         new() {
             Nazev = "Vyčistit dočasné soubory", Kategorie = Kategorie.Cisteni, MeniSystem = true,
@@ -155,7 +169,7 @@ public static class ServisniKatalog
             Nazev = "Přehled hardwaru", Kategorie = Kategorie.HwInfo,
             Popis = "Systém, procesor, paměť, deska, BIOS, grafika, disky, volné místo, síť.",
             Spustit = (log, _) => HardwareInfoService.ZpravaAsync(log) },
-    };
+    }.Concat(NastrojeService.Vse()).ToList();
 
     private static long SmazObsah(string dir, IProgress<string> log, CancellationToken ct)
     {

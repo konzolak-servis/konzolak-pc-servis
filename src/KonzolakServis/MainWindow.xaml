@@ -45,7 +45,9 @@
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
       <TextBlock x:Name="Nadpis" FontSize="24" FontWeight="SemiBold"/>
-      <WrapPanel x:Name="Akce" Grid.Row="1" Margin="0,16,0,4"/>
+      <ScrollViewer Grid.Row="1" Margin="0,16,0,4" MaxHeight="330" VerticalScrollBarVisibility="Auto">
+        <WrapPanel x:Name="Akce"/>
+      </ScrollViewer>
 
       <!-- Přepínač: čitelný výsledek / podrobný log -->
       <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">

@@ -1,3 +1,10 @@
+## 0.4
+- Nová sekce Nástroje Windows: God Mode a rychlé spuštění 30 systémových nástrojů (Správce zařízení, Správa disků, msconfig, registry, Prohlížeč událostí, Monitor spolehlivosti, Monitor prostředků, Plánovač úloh, test RAM, dxdiag, příkazový řádek jako správce…).
+- Restart do BIOSu/UEFI a do pokročilého spuštění (nouzový režim, oprava spuštění).
+- Diagnostika – Zabezpečení a licence: antivirus a jeho definice, Windows Defender (aktualizace definic, rychlá kontrola), firewall (zapnutí jedním klikem), stáří aktualizací Windows, UAC, Secure Boot, TPM, BitLocker (upozornění na obnovovací klíč), aktivace Windows a OEM klíč z BIOSu.
+- Diagnostika – Zařízení a ovladače: zařízení s vykřičníkem, vysvětlení kódu chyby a doporučený postup.
+- Opravy – Záloha ovladačů do složky (pro obnovu po reinstalaci Windows).
+
 ## 0.3
 - Nová sekce Optimalizace s tlačítky nápravy přímo u každé položky.
 - Programy po spuštění: vypnutí / zapnutí jedním klikem (stejně jako ve Správci úloh), u každého programu popis, doporučení a vliv na rychlost startu. Tlačítko „Vypnout doporučené“.
