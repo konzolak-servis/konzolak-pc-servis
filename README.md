@@ -39,7 +39,7 @@ Akce, které mění systém, se před spuštěním vždy zeptají.
 Barvy (navy #0F2038 a zlatá #C8992E) a logo jsou převzaté z webu servis.konzolak.com. Barvy jsou v `src/KonzolakServis/Themes/Theme.xaml`, logo v `src/KonzolakServis/Assets/logo.png`.
 
 ## Plán dalších verzí
-1. Ikona aplikace (.ico) z loga.
+1. Vydávání verzí (GitHub Releases) místo dočasných artefaktů.
 2. **Doladění parseru perfmon zprávy** na skutečném `report.xml` + české vysvětlení a tlačítko „Opravit“ u známých problémů.
 3. **Přehledová obrazovka „Zdraví PC“** – skóre 0–100 a semafor (disk, RAM, teploty, místo, aktualizace, ovladače).
 4. **Jedno tlačítko „Rychlý servis“** – bod obnovení → čištění → DISM → SFC → optimalizace → protokol.
