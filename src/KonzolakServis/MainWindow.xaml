@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Konzolák Servis" Icon="Assets/konzolak.ico" Width="1220" Height="800" MinWidth="980" MinHeight="620"
         Background="{StaticResource Pozadi}" Foreground="{StaticResource Text}"
-        FontFamily="{StaticResource Pismo}" WindowStartupLocation="CenterScreen">
+        FontFamily="{StaticResource Pismo}" WindowStartupLocation="CenterScreen" Loaded="Window_Loaded">
   <Grid>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="230"/>
@@ -17,6 +17,19 @@
         <TextBlock Text="servis a údržba PC" Margin="0,8,0,0" Foreground="{StaticResource TextTlumeny}"/>
       </StackPanel>
       <StackPanel DockPanel.Dock="Bottom" Margin="20">
+        <Border x:Name="AktualizaceBox" Visibility="Collapsed" Background="{StaticResource Pozadi}" BorderBrush="{StaticResource Akcent}"
+                BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,14">
+          <StackPanel>
+            <TextBlock x:Name="AktualizaceText" TextWrapping="Wrap" FontWeight="SemiBold"/>
+            <Button x:Name="Aktualizovat" Content="Aktualizovat" Style="{StaticResource TlacitkoMale}" Margin="0,8,0,0"
+                    HorizontalAlignment="Stretch" Click="Aktualizovat_Click"/>
+          </StackPanel>
+        </Border>
+        <TextBlock x:Name="VerzeInfo" FontSize="12" Foreground="{StaticResource TextTlumeny}"/>
+        <StackPanel Orientation="Horizontal" Margin="0,4,0,10">
+          <TextBlock FontSize="12"><Hyperlink Foreground="{StaticResource Akcent}" Click="Novinky_Click">Co je nového</Hyperlink></TextBlock>
+          <TextBlock FontSize="12" Margin="12,0,0,0"><Hyperlink Foreground="{StaticResource Akcent}" Click="Zkontrolovat_Click">Hledat aktualizace</Hyperlink></TextBlock>
+        </StackPanel>
         <TextBlock x:Name="AdminInfo" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextTlumeny}"/>
       </StackPanel>
       <StackPanel x:Name="Menu"/>

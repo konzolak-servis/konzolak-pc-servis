@@ -11,7 +11,12 @@
     <ApplicationIcon>Assets\konzolak.ico</ApplicationIcon>
     <Product>Konzolák Servis</Product>
     <Company>Konzolák</Company>
-    <Version>0.1.0</Version>
+    <!-- Verze = HlavniVerze.CisloBuildu; číslo buildu doplňuje GitHub Actions (každý build +1) -->
+    <HlavniVerze>0.2</HlavniVerze>
+    <CisloBuildu Condition="'$(CisloBuildu)' == ''">0</CisloBuildu>
+    <Version>$(HlavniVerze).$(CisloBuildu)</Version>
+    <!-- Odkud se stahují aktualizace (veřejný GitHub repozitář s vydáními) -->
+    <RepoAktualizaci Condition="'$(RepoAktualizaci)' == ''">konzolak-servis/konzolak-pc-servis</RepoAktualizaci>
     <AssemblyTitle>Konzolák Servis – diagnostika a údržba PC</AssemblyTitle>
     <Description>Diagnostika, opravy a údržba počítačů se systémem Windows 10 a 11.</Description>
     <Copyright>© Konzolák Zlín</Copyright>
@@ -27,6 +32,11 @@
   <ItemGroup>
     <Resource Include="Assets\logo.png" />
     <Resource Include="Assets\konzolak.ico" />
+    <EmbeddedResource Include="Novinky.md" LogicalName="Novinky.md" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepoAktualizaci</_Parameter1>
+      <_Parameter2>$(RepoAktualizaci)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />

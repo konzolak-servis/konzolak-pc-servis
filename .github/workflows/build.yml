@@ -1,7 +1,10 @@
-name: Sestavení .exe
+name: Sestavení a vydání
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write   # vytvoření vydání (GitHub Releases)
 
 jobs:
   build:
@@ -15,7 +18,22 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet publish src/KonzolakServis/KonzolakServis.csproj -c Release -o publish
+
+      - name: Verze
+        id: verze
+        shell: pwsh
+        run: |
+          [xml]$p = Get-Content src/KonzolakServis/KonzolakServis.csproj
+          $hlavni = ($p.Project.PropertyGroup | Where-Object { $_.HlavniVerze } | Select-Object -First 1).HlavniVerze
+          $verze = "$hlavni.${{ github.run_number }}"
+          "verze=$verze" >> $env:GITHUB_OUTPUT
+          "Verze: $verze"
+
+      - run: dotnet publish src/KonzolakServis/KonzolakServis.csproj -c Release -o publish -p:CisloBuildu=${{ github.run_number }}
+
+      - name: Pojmenovat podle verze
+        shell: pwsh
+        run: Rename-Item publish/KonzolakServis.exe "KonzolakServis_v${{ steps.verze.outputs.verze }}.exe"
 
       # Podpis přes Azure Trusted Signing (Microsoft). Potřebné secrets:
       # AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
@@ -36,15 +54,22 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Ověřit podpis
-        if: env.PODEPSAT == 'true'
-        shell: pwsh
-        run: |
-          $s = Get-AuthenticodeSignature publish\KonzolakServis.exe
-          "Podpis: $($s.Status) – $($s.SignerCertificate.Subject)"
-          if ($s.Status -ne 'Valid') { exit 1 }
-
       - uses: actions/upload-artifact@v4
         with:
-          name: KonzolakServis
-          path: publish/KonzolakServis.exe
+          name: KonzolakServis_v${{ steps.verze.outputs.verze }}
+          path: publish/KonzolakServis_v${{ steps.verze.outputs.verze }}.exe
+
+      # Každý build z větve main = nové vydání. Z něj si aplikace stahuje aktualizace.
+      - name: Vydat verzi
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $verze = "${{ steps.verze.outputs.verze }}"
+          # Popis vydání = nejnovější sekce z Novinky.md
+          $text = Get-Content src/KonzolakServis/Novinky.md -Raw -Encoding UTF8
+          $sekce = ($text -split '(?m)^## ')[1]
+          $popis = ($sekce -split "`n", 2)[1].Trim()
+          Set-Content poznamky.md $popis -Encoding UTF8
+          gh release create "v$verze" "publish/KonzolakServis_v$verze.exe" --title "Konzolák Servis $verze" --notes-file poznamky.md

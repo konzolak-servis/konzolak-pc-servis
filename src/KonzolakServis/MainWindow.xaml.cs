@@ -31,6 +31,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Konzolák Servis v{AktualizaceService.VerzeText}";
+        VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText}";
         _log.Radek += l => Dispatcher.Invoke(() => { Konzole.AppendText(l + Environment.NewLine); Konzole.ScrollToEnd(); });
 
         var admin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
@@ -253,6 +255,89 @@ public partial class MainWindow : Window
         if (MessageBox.Show($"Soubor byl uložen:\n{cesta}\n\nOtevřít ho?", "Konzolák Servis",
                 MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
             Process.Start(new ProcessStartInfo(cesta) { UseShellExecute = true });
+    }
+
+    // ---------- Aktualizace a novinky ----------
+
+    private NovaVerze? _nova;
+
+    private async void Window_Loaded(object s, RoutedEventArgs e) => await ZkontrolujAsync(tiše: true);
+
+    private async void Zkontrolovat_Click(object s, RoutedEventArgs e) => await ZkontrolujAsync(tiše: false);
+
+    private async Task ZkontrolujAsync(bool tiše)
+    {
+        try
+        {
+            _nova = await AktualizaceService.ZkontrolujAsync();
+        }
+        catch (Exception ex)
+        {
+            _log.Zapis($"Kontrola aktualizací se nezdařila: {ex.Message}");
+            if (!tiše) MessageBox.Show("Kontrola aktualizací se nezdařila. Zkontroluj připojení k internetu.", "Konzolák Servis");
+            return;
+        }
+        if (_nova != null)
+        {
+            AktualizaceText.Text = $"K dispozici je nová verze {_nova.Verze.Major}.{_nova.Verze.Minor}.{_nova.Verze.Build}";
+            AktualizaceBox.Visibility = Visibility.Visible;
+            _log.Zapis($"Dostupná nová verze {_nova.Tag}.");
+        }
+        else if (!tiše)
+            MessageBox.Show($"Používáš nejnovější verzi {AktualizaceService.VerzeText}.", "Konzolák Servis");
+    }
+
+    private async void Aktualizovat_Click(object s, RoutedEventArgs e)
+    {
+        if (_nova == null || _cts != null) return;
+        var z = NovinkyZpravou($"Co je nového ve verzi {_nova.Tag}", _nova.Novinky);
+        z.Shrnuti = $"Aktualizace z verze {AktualizaceService.VerzeText} na {_nova.Tag.TrimStart('v')}.";
+        Vykresli(z); ZalozkaVysledek.IsChecked = true;
+        if (MessageBox.Show($"Stáhnout a nainstalovat verzi {_nova.Tag}?\nAplikace se poté sama restartuje.",
+                "Aktualizace Konzolák Servis", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+        _cts = new CancellationTokenSource();
+        Aktualizovat.IsEnabled = false; Prubeh.Visibility = Visibility.Visible; Akce.IsEnabled = false;
+        StavText.Text = "Stahuji aktualizaci…";
+        try
+        {
+            await AktualizaceService.NainstalujAsync(_nova, new Progress<string>(l => { _log.Zapis(l); StavText.Text = l; }), _cts.Token);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            _log.Zapis($"Aktualizace selhala: {ex.Message}");
+            MessageBox.Show($"Aktualizace se nezdařila:\n{ex.Message}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _cts?.Dispose(); _cts = null;
+            Aktualizovat.IsEnabled = true; Prubeh.Visibility = Visibility.Collapsed; Akce.IsEnabled = true;
+        }
+    }
+
+    private void Novinky_Click(object s, RoutedEventArgs e)
+    {
+        var z = NovinkyZpravou("Co je nového", AktualizaceService.NovinkyVAplikaci());
+        z.Shrnuti = $"Používáš verzi {AktualizaceService.VerzeText}.";
+        _posledni = z; UlozitVysledek.IsEnabled = true;
+        Vykresli(z); ZalozkaVysledek.IsChecked = true;
+    }
+
+    /// <summary>Převede seznam změn („## verze“ + „- položka“) na zprávu.</summary>
+    private static Zprava NovinkyZpravou(string nadpis, string text)
+    {
+        var z = new Zprava(nadpis) { Stav = Stav.Info };
+        SekceZpravy? sekce = null;
+        foreach (var radek in text.Replace("\r", "").Split('\n'))
+        {
+            var t = radek.Trim();
+            if (t.StartsWith("#")) sekce = z.PridejSekci("Verze " + t.TrimStart('#', ' '));
+            else if (t.StartsWith("- ") || t.StartsWith("* "))
+                (sekce ??= z.PridejSekci("Změny")).Pridej(t[2..].Trim(), "", Stav.Ok);
+        }
+        if (z.Sekce.Count == 0) z.PridejSekci("Změny").Pridej(text.Trim().Length > 0 ? text.Trim() : "Bez popisu změn.");
+        return z;
     }
 
     private static string Bezpecne(string s) =>

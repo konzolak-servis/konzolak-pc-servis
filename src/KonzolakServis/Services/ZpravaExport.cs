@@ -67,7 +67,7 @@ public static class ZpravaExport
             td.d{width:14px} .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-top:5px}
             td.p{width:38%;font-weight:600} .det{color:#8C9AB3;font-size:13px;white-space:pre-wrap;margin-top:4px}
             footer{margin-top:30px;color:#8C9AB3;font-size:12px;text-align:center}
-            @media print{body{background:#fff;color:#000}table,.sum{background:#f4f4f4}td{border-color:#ddd}}
+            @media print{body{background:#fff;color:#000}table,.sum{background:#f4f4f4}td{border-color:#ddd} }
             </style></head><body><div class="wrap">
             <header>{{Logo()}}<div><h1>{{E(z.Nadpis)}}</h1>
             <div class="meta">Počítač {{E(z.Pocitac)}} · {{z.Cas:d. M. yyyy HH:mm}}</div></div></header>
