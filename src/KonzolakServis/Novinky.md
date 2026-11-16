@@ -1,3 +1,14 @@
+## 0.7
+- Karty na úvodní stránce mají tlačítko „Podrobnosti“ s kompletním výpisem.
+- Paměť RAM do detailu: každý modul zvlášť (slot, kanál, výrobce, part number, sériové číslo, kapacita, typ DDR, jmenovitý a aktuální takt, napětí, ECC), počet volných slotů, maximální podporovaná kapacita, režim single/dual-channel, kontrola XMP/EXPO a stejných modulů + doporučení.
+- Procesor: aktivní jádra, aktuální takt, cache L2/L3, napětí, virtualizace v BIOSu, ID procesoru.
+- Grafika: výrobce, čip, ovladač s upozorněním na starý ovladač, barevná hloubka, max. obnovovací frekvence.
+- Nová karta Monitory: model, úhlopříčka, sériové číslo, rok výroby.
+- Disky: teplota, opotřebení SSD, hodiny v provozu, počet zapnutí, chyby čtení/zápisu, sériové číslo, firmware.
+- Deska a BIOS: revize, sériové číslo / Service Tag, typ skříně, stáří BIOSu, TPM, Secure Boot.
+- Systém: edice, přesné sestavení, ID produktu, doména / pracovní skupina.
+- Uložený přehled (HTML/TXT) obsahuje i všechny podrobnosti.
+
 ## 0.6
 - Nová úvodní stránka „Přehled PC“: systém, procesor, grafická karta (včetně skutečné velikosti paměti), operační paměť (typ DDR, takt, obsazené sloty, upozornění na single-channel), základní deska a BIOS/UEFI, disky (SSD/HDD, NVMe/SATA, stav), volné místo na oddílech, síť, baterie a teploty (kde je deska poskytuje).
 - Živé vytížení procesoru a paměti a doba běhu od posledního restartu (upozornění, když PC běží déle než 14 dní).

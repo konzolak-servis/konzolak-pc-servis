@@ -213,20 +213,45 @@ public partial class MainWindow : Window
         sp.Children.Add(new TextBlock { Text = k.Nadpis.ToUpperInvariant(), Foreground = B("Akcent"), FontSize = 11.5, FontWeight = FontWeights.SemiBold });
         sp.Children.Add(new TextBox { Text = k.Hlavni, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, IsReadOnly = true,
             BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = B("Text"), Margin = new Thickness(0, 2, 0, 8) });
-        foreach (var (p, h, st) in k.Radky)
+        foreach (var (p, h, st) in k.Radky) sp.Children.Add(RadekKarty(p, h, st, 120));
+        var karta = new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 14),
+            Margin = new Thickness(0, 0, 12, 12), Width = 400, Child = sp, VerticalAlignment = VerticalAlignment.Top };
+
+        if (k.Detail.Count > 0)
         {
-            var g = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.Children.Add(new TextBlock { Text = p, Foreground = B("TextTlumeny"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap });
-            var hod = new TextBox { Text = h, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, IsReadOnly = true, BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent, Foreground = st is Stav.Chyba ? B("Chyba") : st is Stav.Varovani ? B("Varovani") : B("Text") };
-            Grid.SetColumn(hod, 1);
-            g.Children.Add(hod);
-            sp.Children.Add(g);
+            var detail = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 6, 0, 0) };
+            foreach (var d in k.Detail)
+            {
+                detail.Children.Add(new TextBlock { Text = d.Nadpis, Foreground = B("Akcent"), FontWeight = FontWeights.SemiBold,
+                    FontSize = 13, Margin = new Thickness(0, 10, 0, 4) });
+                foreach (var (p, h, st) in d.Radky) detail.Children.Add(RadekKarty(p, h, st, 170));
+            }
+            var tl = new Button { Content = "Podrobnosti ▾", Style = (Style)FindResource("TlacitkoMale"), HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 10, 0, 0) };
+            tl.Click += (_, _) =>
+            {
+                var otevreno = detail.Visibility == Visibility.Visible;
+                detail.Visibility = otevreno ? Visibility.Collapsed : Visibility.Visible;
+                tl.Content = otevreno ? "Podrobnosti ▾" : "Skrýt podrobnosti ▴";
+                karta.Width = otevreno ? 400 : 812;   // rozbalená karta přes dvě kolonky
+            };
+            sp.Children.Add(tl);
+            sp.Children.Add(detail);
         }
-        return new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 14),
-            Margin = new Thickness(0, 0, 12, 12), Width = 400, Child = sp };
+        return karta;
+    }
+
+    private UIElement RadekKarty(string p, string h, Stav? st, double sirkaPopisu)
+    {
+        var g = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(sirkaPopisu) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        g.Children.Add(new TextBlock { Text = p, Foreground = B("TextTlumeny"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap });
+        var hod = new TextBox { Text = h, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, IsReadOnly = true, BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent, Foreground = st is Stav.Chyba ? B("Chyba") : st is Stav.Varovani ? B("Varovani") : B("Text") };
+        Grid.SetColumn(hod, 1);
+        g.Children.Add(hod);
+        return g;
     }
 
     // ---------- Vykreslení výsledku ----------
