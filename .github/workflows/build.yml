@@ -2,15 +2,48 @@ name: Sestavení .exe
 on:
   push:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Podepisování se zapne samo, jakmile jsou v repozitáři nastavené tajné klíče
+      # (Settings → Secrets and variables → Actions). Bez nich se sestaví nepodepsaný .exe.
+      PODEPSAT: ${{ secrets.AZURE_CLIENT_ID != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
       - run: dotnet publish src/KonzolakServis/KonzolakServis.csproj -c Release -o publish
+
+      # Podpis přes Azure Trusted Signing (Microsoft). Potřebné secrets:
+      # AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+      # TRUSTED_SIGNING_ENDPOINT, TRUSTED_SIGNING_ACCOUNT, TRUSTED_SIGNING_PROFILE
+      - name: Podepsat .exe
+        if: env.PODEPSAT == 'true'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\publish
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Ověřit podpis
+        if: env.PODEPSAT == 'true'
+        shell: pwsh
+        run: |
+          $s = Get-AuthenticodeSignature publish\KonzolakServis.exe
+          "Podpis: $($s.Status) – $($s.SignerCertificate.Subject)"
+          if ($s.Status -ne 'Valid') { exit 1 }
+
       - uses: actions/upload-artifact@v4
         with:
           name: KonzolakServis

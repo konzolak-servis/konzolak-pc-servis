@@ -12,6 +12,11 @@
     <Product>Konzolák Servis</Product>
     <Company>Konzolák</Company>
     <Version>0.1.0</Version>
+    <AssemblyTitle>Konzolák Servis – diagnostika a údržba PC</AssemblyTitle>
+    <Description>Diagnostika, opravy a údržba počítačů se systémem Windows 10 a 11.</Description>
+    <Copyright>© Konzolák Zlín</Copyright>
+    <!-- Windows 10 (1809+) a Windows 11; x64 -->
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <NeutralLanguage>cs-CZ</NeutralLanguage>
     <!-- Jeden samostatný .exe, bez nutnosti instalovat .NET -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
