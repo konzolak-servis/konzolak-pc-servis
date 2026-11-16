@@ -164,6 +164,11 @@ public static class ServisniKatalog
                     "Síť resetována – restartuj PC", "Reset sítě selhal");
             }},
 
+        new() {
+            Nazev = "Test rychlosti internetu", Kategorie = Kategorie.Sit,
+            Popis = "Stahování, odesílání, ping, kolísání a síla Wi-Fi. Zdarma, servery Cloudflare.",
+            Spustit = async (log, ct) => Vysl(await RychlostSiteService.ZpravaAsync(log, ct)) },
+
         // ---------- HW INFO ----------
         new() {
             Nazev = "Přehled hardwaru", Kategorie = Kategorie.HwInfo,

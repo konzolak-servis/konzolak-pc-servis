@@ -7,10 +7,20 @@ namespace KonzolakServis.Services;
 
 /// <summary>Problém ze sekce „Výsledky diagnostiky“ (chyba / upozornění / informace).</summary>
 public sealed record Zjisteni(Stav Zavaznost, string Priznak, string Pricina, string Podrobnosti,
-                              string Reseni, IReadOnlyList<string> TykaSe);
+                              string Reseni, IReadOnlyList<string> TykaSe)
+{
+    /// <summary>ID pravidla ve zprávě (např. ruleFailService_1) – spojuje problém se základní kontrolou.</summary>
+    public string Id { get; init; } = "";
+}
 
 /// <summary>Řádek „Základní kontroly systému“ (OS, disky, zabezpečení, služby, ovladače).</summary>
-public sealed record Kontrola(Stav Stav, string Nazev, string Vysledek, string Popis);
+public sealed record Kontrola(Stav Stav, string Nazev, string Vysledek, string Popis)
+{
+    /// <summary>Odkaz na tabulku zprávy (např. TableBasicService) – podle něj víme, o jakou kontrolu jde.</summary>
+    public string Odkaz { get; init; } = "";
+    /// <summary>ID problémů, které kontrolu shodily.</summary>
+    public IReadOnlyList<string> Priciny { get; init; } = Array.Empty<string>();
+}
 
 /// <summary>Řádek „Přehled prostředků“ (procesor, síť, disk, paměť).</summary>
 public sealed record Vytizeni(Stav Stav, string Soucast, string Hodnoceni, string Procent, string Detail);
@@ -63,7 +73,11 @@ public static class PerfmonReportService
     public static Zprava DoZpravy(PerfmonZprava pz)
     {
         var v = pz.Vysledek;
-        var z = new Zprava("Kompletní diagnostika systému");
+        var z = new Zprava("Kompletní diagnostika systému")
+        {
+            // po nápravě se celá diagnostika spustí znovu a ukáže nový výsledek
+            Obnovit = async (l, c) => DoZpravy(await VytvorAsync(l, c))
+        };
         var chyby = v.Zjisteni.Count(x => x.Zavaznost == Stav.Chyba) + v.Kontroly.Count(k => k.Stav == Stav.Chyba);
         var varov = v.Zjisteni.Count(x => x.Zavaznost == Stav.Varovani) + v.Kontroly.Count(k => k.Stav == Stav.Varovani)
                   + v.Prostredky.Count(q => q.Stav is Stav.Varovani or Stav.Chyba);
@@ -92,7 +106,27 @@ public static class PerfmonReportService
         if (v.Kontroly.Count > 0)
         {
             var k = z.PridejSekci("Základní kontroly systému");
-            foreach (var x in v.Kontroly) k.Pridej(x.Nazev, x.Vysledek, x.Stav, x.Popis);
+            foreach (var x in v.Kontroly)
+            {
+                var (coZnamena, overit, akceKontroly) = VysvetleniKontroly(x.Odkaz);
+                if (x.Stav is Stav.Ok or Stav.Info)
+                {
+                    k.Pridej(x.Nazev, x.Vysledek, x.Stav, $"{x.Popis}. {coZnamena}");
+                    continue;
+                }
+                var pricinyZ = v.Zjisteni.Where(p => x.Priciny.Contains(p.Id)).ToList();
+                var det = new List<string>();
+                det.Add(pricinyZ.Count > 0
+                    ? "Důvod: " + string.Join("; ", pricinyZ.Select(p => p.TykaSe.Count > 0 ? $"{p.Priznak} ({string.Join(", ", p.TykaSe)})" : p.Priznak))
+                    : "Důvod: Windows ve zprávě konkrétní příčinu neuvedl – podívejte se do sekce Nalezené problémy výše.");
+                det.Add($"Co to znamená: {coZnamena}");
+                foreach (var p in pricinyZ.Where(p => p.Reseni.Length > 0)) det.Add($"Řešení: {p.Reseni}");
+                det.Add($"Jak to ověřit: {overit}");
+                var akce = pricinyZ.SelectMany(p => p.TykaSe).Where(t => !t.Contains(':') && SluzbyService.Existuje(t)).Distinct()
+                    .Select(t => new AkceRadku($"Restartovat službu {t}", (l, c) => SluzbyService.RestartAsync(t, l, c)) { Doporucena = true })
+                    .Concat(akceKontroly).ToArray();
+                k.Pridej(x.Nazev, x.Vysledek, x.Stav, string.Join("\n", det), akce);
+            }
         }
         if (v.Prostredky.Count > 0)
         {
@@ -103,6 +137,35 @@ public static class PerfmonReportService
         z.PridejSekci("Zpráva Windows").Pridej("Úplná zpráva perfmon", pz.HtmlCesta ?? pz.SlozkaZpravy);
         return z;
     }
+
+    private static AkceRadku Otevrit(string text, string exe, string args = "") =>
+        new(text, (_, _) =>
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, args) { UseShellExecute = true });
+            return Task.FromResult($"Otevřeno: {text.Replace("Otevřít ", "")}");
+        });
+
+    /// <summary>Co základní kontrola znamená, jak ji ověřit a čím otevřít.</summary>
+    private static (string CoZnamena, string Overit, AkceRadku[] Akce) VysvetleniKontroly(string odkaz) => odkaz switch
+    {
+        "TableBasicService" => ("Windows kontroluje, jestli některá služba nespadla nebo neskončila s chybou. Jednorázový pád nevadí, opakovaný ukazuje na problém s programem nebo ovladačem.",
+            "Otevřete Služby (services.msc) a zkontrolujte stav uvedené služby; v Prohlížeči událostí → Systém hledejte chyby „Service Control Manager“ (ID 7031, 7034).",
+            new[] { Otevrit("Otevřít Služby", "services.msc"), Otevrit("Otevřít Prohlížeč událostí", "eventvwr.msc") }),
+        "TableBasicSMART" => ("Kontrola stavu disků podle SMART a příznaku „dirty“ (poškozený souborový systém).",
+            "Spusťte Disky → Zdraví disků (SMART) a Kontrola systémového disku.",
+            Array.Empty<AkceRadku>()),
+        "TableBasicOperatingSystem" => ("Kontrola základních údajů o Windows (verze, nastavení systému).",
+            "Spusťte Opravy → DISM a SFC, zkontrolujte Windows Update.",
+            new[] { Otevrit("Otevřít Windows Update", "ms-settings:windowsupdate") }),
+        "TableBasicAntiSpywareProduct" or "TableBasicAntiVirusProduct" or "TableBasicFirewallProduct" =>
+            ("Kontrola Centra zabezpečení: antivirus, antispyware, firewall a UAC.",
+            "Spusťte Diagnostika → Zabezpečení a licence.",
+            new[] { Otevrit("Otevřít Zabezpečení Windows", "windowsdefender:") }),
+        "TableController" => ("Kontrola zařízení a ovladačů přes WMI.",
+            "Spusťte Diagnostika → Zařízení a ovladače, nebo otevřete Správce zařízení a hledejte vykřičníky.",
+            new[] { Otevrit("Otevřít Správce zařízení", "devmgmt.msc") }),
+        _ => ("", "Podívejte se na sekci Nalezené problémy výše.", Array.Empty<AkceRadku>())
+    };
 
     private static string Tvar(int n, string jeden, string dva, string pet) =>
         n == 1 ? jeden : n is >= 2 and <= 4 ? dva : pet;
@@ -182,8 +245,12 @@ public static class PerfmonReportService
             {
                 case "alltests":
                     foreach (var i in table.Elements("Item"))
+                    {
+                        var odkaz = (string?)D(i, "alltestgroups")?.Attribute("link") ?? "";
                         kontroly.Add(new Kontrola(ZObrazku((string?)D(i, "allteststatus")?.Attribute("img"), Stav.Info),
-                            H(i, "alltestgroups"), H(i, "allteststatus"), H(i, "alltestdesc")));
+                            H(i, "alltestgroups"), H(i, "allteststatus"), H(i, "alltestdesc"))
+                            { Odkaz = odkaz, Priciny = PricinyKontroly(root, odkaz) });
+                    }
                     break;
 
                 case "sysHealthSummary":
@@ -208,12 +275,26 @@ public static class PerfmonReportService
                                    jmeno.Contains("error") ? Stav.Chyba : jmeno.Contains("warn") ? Stav.Varovani : Stav.Info);
                         var id = (string?)sym.Attribute("message") ?? (string?)sev?.Attribute("message");
                         zjisteni.Add(new Zjisteni(stav, priznak, H(i, "cause"), H(i, "details"), H(i, "resolution"),
-                            id == null ? new List<string>() : TykaSe(root, id, T)));
+                            id == null ? new List<string>() : TykaSe(root, id, T)) { Id = id ?? "" });
                     }
                     break;
             }
         }
         return new(zjisteni.OrderBy(z => Poradi(z.Zavaznost)).ToList(), kontroly, prostredky);
+    }
+
+    /// <summary>
+    /// Proč kontrola selhala: tabulka kontroly (odkaz) patří do tématu (topic); tabulky stejného tématu
+    /// s atributem warning nesou ID problému (např. TableBasicAbnormallyStoppedServices → ruleFailService_1).
+    /// </summary>
+    private static List<string> PricinyKontroly(XElement root, string odkaz)
+    {
+        if (odkaz.Length == 0) return new();
+        var tema = root.Descendants("Table").FirstOrDefault(t => (string?)t.Attribute("name") == odkaz)?.Attribute("topic")?.Value;
+        if (tema == null) return new();
+        return root.Descendants("Table")
+            .Where(t => (string?)t.Attribute("topic") == tema && t.Attribute("warning") != null)
+            .Select(t => t.Attribute("warning")!.Value).Distinct().ToList();
     }
 
     /// <summary>Konkrétní položky, kterých se problém týká (např. názvy havarovaných služeb).</summary>

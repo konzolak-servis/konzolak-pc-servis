@@ -88,10 +88,34 @@ public static class SluzbyService
 
     public static async Task<string> RestartAsync(string sluzba, IProgress<string> log, CancellationToken ct)
     {
-        await ProcessRunner.RunAsync("sc.exe", $"stop \"{sluzba}\"", log, ct);
-        await Task.Delay(1500, ct);
-        var rc = await ProcessRunner.RunAsync("sc.exe", $"start \"{sluzba}\"", log, ct);
-        return rc == 0 ? $"Služba {sluzba} znovu spuštěna." : $"Službu {sluzba} se nepodařilo spustit (kód {rc}) – podrobnosti v logu.";
+        var pred = StavSluzby(sluzba);
+        if (pred.Rezim == "Disabled")
+            return $"CHYBA: Služba {sluzba} je zakázaná, nejde spustit. Pokud ji potřebujete, povolte ji v Optimalizace → Služby Windows.";
+        if (pred.Beh == "Running")
+        {
+            await ProcessRunner.RunAsync("sc.exe", $"stop \"{sluzba}\"", log, ct);
+            for (var i = 0; i < 15 && StavSluzby(sluzba).Beh != "Stopped"; i++) await Task.Delay(1000, ct);
+        }
+        await ProcessRunner.RunAsync("sc.exe", $"start \"{sluzba}\"", log, ct);
+        for (var i = 0; i < 15 && StavSluzby(sluzba).Beh != "Running"; i++)
+            await Task.Delay(1000, ct);
+        var po = StavSluzby(sluzba);
+        if (po.Beh == "Running")
+            return $"Služba {sluzba} byla restartována a běží.";
+        if (po.Rezim == "Manual")
+            return $"Služba {sluzba} se spustila a zase sama ukončila – to je u ní normální (spouští se jen když ji Windows potřebuje). Chyba z diagnostiky byla jednorázová, není třeba nic dalšího dělat.";
+        return $"CHYBA: Služba {sluzba} se nespustila (stav: {po.Beh}). Podrobnosti v záložce Podrobný log.";
+    }
+
+    private static Stav0 StavSluzby(string sluzba)
+    {
+        try
+        {
+            using var s = new ManagementObjectSearcher($"SELECT StartMode, State FROM Win32_Service WHERE Name='{sluzba.Replace("'", "")}'");
+            foreach (var o in s.Get()) return new Stav0((string)o["StartMode"], (string)o["State"], true);
+        }
+        catch { }
+        return new Stav0("", "neznámý", false);
     }
 
     public static bool Existuje(string sluzba)

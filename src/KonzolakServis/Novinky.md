@@ -1,3 +1,11 @@
+## 0.5
+- Každé tlačítko nápravy teď ukáže výsledek: zelené nebo červené oznámení nahoře, u chyby i okno s vysvětlením.
+- Po nápravě se příslušná kontrola sama spustí znovu a ukáže nový výsledek se srovnáním „před nápravou / po nápravě“ (u Kompletní diagnostiky se celá diagnostika provede znovu).
+- Restart služby ověří, že služba opravdu běží; u služeb, které se spouštějí jen na vyžádání (např. MapsBroker), vysvětlí, že samovolné ukončení je normální.
+- Základní kontroly systému: u neúspěšné kontroly důvod (provázaný s nalezeným problémem), co to znamená, jak to ověřit a tlačítka nápravy (restart služby, otevření Služeb, Prohlížeče událostí, Správce zařízení…).
+- Nový test rychlosti internetu: stahování, odesílání, ping, kolísání, ztráta paketů, síla Wi-Fi a doporučení. Zdarma, bez účtu.
+- Kontrola aktualizací řekne, proč nejsou nové verze dostupné.
+
 ## 0.4
 - Nová sekce Nástroje Windows: God Mode a rychlé spuštění 30 systémových nástrojů (Správce zařízení, Správa disků, msconfig, registry, Prohlížeč událostí, Monitor spolehlivosti, Monitor prostředků, Plánovač úloh, test RAM, dxdiag, příkazový řádek jako správce…).
 - Restart do BIOSu/UEFI a do pokročilého spuštění (nouzový režim, oprava spuštění).

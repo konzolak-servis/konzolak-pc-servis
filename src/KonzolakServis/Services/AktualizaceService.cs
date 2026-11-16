@@ -32,12 +32,30 @@ public static class AktualizaceService
         return h;
     }
 
-    /// <summary>Vrátí novější verzi, nebo null (žádná novější / bez internetu / repo nedostupné).</summary>
+    /// <summary>Proč poslední kontrola nedopadla (null = kontrola proběhla v pořádku).</summary>
+    public static string? PosledniChyba { get; private set; }
+
+    /// <summary>Vrátí novější verzi, nebo null (žádná novější / chyba – viz PosledniChyba).</summary>
     public static async Task<NovaVerze?> ZkontrolujAsync(CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(Repo)) return null;
-        using var resp = await Http.GetAsync($"https://api.github.com/repos/{Repo}/releases/latest", ct);
-        if (!resp.IsSuccessStatusCode) return null;
+        PosledniChyba = null;
+        if (string.IsNullOrWhiteSpace(Repo)) { PosledniChyba = "V této verzi není nastavený server aktualizací."; return null; }
+        HttpResponseMessage resp;
+        try { resp = await Http.GetAsync($"https://api.github.com/repos/{Repo}/releases/latest", ct); }
+        catch (Exception ex) { PosledniChyba = $"Nepodařilo se připojit k serveru aktualizací (zkontrolujte internet). {ex.Message}"; return null; }
+        using var _ = resp;
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            PosledniChyba = "Server aktualizací není veřejně dostupný – úložiště s vydáními (GitHub) je zatím soukromé. " +
+                            "Novou verzi je zatím potřeba stáhnout ručně.";
+            return null;
+        }
+        if ((int)resp.StatusCode == 403)
+        {
+            PosledniChyba = "Server aktualizací dočasně odmítl dotaz (limit GitHubu). Zkuste to za hodinu.";
+            return null;
+        }
+        if (!resp.IsSuccessStatusCode) { PosledniChyba = $"Server aktualizací vrátil chybu {(int)resp.StatusCode}."; return null; }
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
         var root = doc.RootElement;
         var tag = root.GetProperty("tag_name").GetString() ?? "";

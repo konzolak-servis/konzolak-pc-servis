@@ -228,11 +228,14 @@ public partial class MainWindow : Window
     {
         var b = new Button { Content = a.Text, Style = (Style)FindResource(a.Doporucena ? "TlacitkoNaprava" : "TlacitkoMale"),
             Margin = new Thickness(0, 0, 8, 4) };
-        b.Click += async (_, _) => await ProvedNapravuAsync(a, z);
+        b.Click += async (_, _) => await ProvedNapravuAsync(a, z, b);
         return b;
     }
 
-    private async Task ProvedNapravuAsync(AkceRadku a, Zprava z)
+    /// <summary>Výsledek nápravy je chyba, když akce vyhodí výjimku nebo text začíná „CHYBA“.</summary>
+    private static bool JeChyba(string t) => t.StartsWith("CHYBA", StringComparison.OrdinalIgnoreCase);
+
+    private async Task ProvedNapravuAsync(AkceRadku a, Zprava z, Button tlacitko)
     {
         if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolák Servis"); return; }
         if (a.Potvrzeni != null &&
@@ -241,32 +244,75 @@ public partial class MainWindow : Window
 
         _cts = new CancellationTokenSource();
         Prubeh.Visibility = Visibility.Visible; Zrusit.IsEnabled = true; Akce.IsEnabled = false; VysledekPanel.IsEnabled = false;
+        var puvodniText = tlacitko.Content;
+        tlacitko.Content = "⏳ Probíhá…";
         StavText.Text = $"Probíhá: {a.Text}…";
         _log.Zapis($"--- Náprava: {a.Text} ---");
-        var progress = new Progress<string>(_log.Zapis);
+        var progress = new Progress<string>(l => { _log.Zapis(l); StavText.Text = l; });
+        string vysledek; bool chyba;
         try
         {
-            var vysledek = await Task.Run(() => a.Spustit(progress, _cts.Token));
-            _log.Zapis(vysledek);
-            StavText.Text = vysledek;
-            if (z.Obnovit != null)
+            vysledek = await Task.Run(() => a.Spustit(progress, _cts.Token));
+            chyba = JeChyba(vysledek);
+            if (chyba) vysledek = vysledek.Substring(5).TrimStart(':', ' ');
+        }
+        catch (OperationCanceledException) { vysledek = "Akce byla přerušena."; chyba = true; }
+        catch (Exception ex) { vysledek = $"Akce se nezdařila: {ex.Message}"; chyba = true; }
+
+        _log.Zapis((chyba ? "CHYBA: " : "OK: ") + vysledek);
+        StavText.Text = vysledek;
+        try
+        {
+            if (!chyba && z.Obnovit != null)
             {
+                StavText.Text = "Ověřuji výsledek – spouštím kontrolu znovu…";
+                ZobrazPrubeh($"{z.Nadpis} – kontrola po nápravě");
                 var nova = await Task.Run(() => z.Obnovit(progress, _cts.Token));
                 _posledni = nova;
                 Vykresli(nova);
+                if (z.Shrnuti != nova.Shrnuti)
+                    vysledek += $"\n\nPřed nápravou: {z.Shrnuti}\nPo nápravě: {nova.Shrnuti}";
+                else
+                    vysledek += $"\n\nKontrola po nápravě: {nova.Shrnuti}";
             }
+            else
+                tlacitko.Content = chyba ? puvodniText : "✔ Hotovo";
         }
         catch (Exception ex)
         {
-            _log.Zapis($"CHYBA: {ex.Message}");
-            StavText.Text = "Náprava selhala – podrobnosti v záložce Podrobný log";
-            MessageBox.Show($"Akce se nezdařila:\n{ex.Message}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _log.Zapis($"Obnovení stavu selhalo: {ex.Message}");
+            Vykresli(z);
+            vysledek += $"\n\nNový výsledek se nepodařilo načíst: {ex.Message}";
         }
         finally
         {
             _cts.Dispose(); _cts = null;
             Prubeh.Visibility = Visibility.Collapsed; Zrusit.IsEnabled = false; Akce.IsEnabled = true; VysledekPanel.IsEnabled = true;
         }
+        if (!chyba && z.Obnovit == null) tlacitko.IsEnabled = false;
+        StavText.Text = vysledek;
+        UkazOznameni(a.Text, vysledek, chyba);
+    }
+
+    /// <summary>Barevné oznámení nahoře ve výsledku – zelené OK / červená chyba.</summary>
+    private void UkazOznameni(string akce, string text, bool chyba)
+    {
+        var stare = VysledekPanel.Children.OfType<Border>().FirstOrDefault(b => (b.Tag as string) == "oznameni");
+        if (stare != null) VysledekPanel.Children.Remove(stare);
+        var obsah = new StackPanel();
+        obsah.Children.Add(new TextBlock { Text = (chyba ? "✖ " : "✔ ") + akce, FontWeight = FontWeights.SemiBold, FontSize = 14 });
+        obsah.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) });
+        var banner = new Border
+        {
+            Tag = "oznameni",
+            Background = B("Pozadi"), BorderBrush = chyba ? B("Chyba") : B("Ok"), BorderThickness = new Thickness(5, 1, 1, 1),
+            CornerRadius = new CornerRadius(6), Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 0, 0, 10),
+            Child = obsah
+        };
+        VysledekPanel.Children.Insert(0, banner);
+        VysledekScroll.ScrollToTop();
+        if (chyba)
+            MessageBox.Show($"{akce}\n\n{text}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // ---------- Tlačítka ----------
@@ -340,6 +386,15 @@ public partial class MainWindow : Window
         {
             _log.Zapis($"Kontrola aktualizací se nezdařila: {ex.Message}");
             if (!tiše) MessageBox.Show("Kontrola aktualizací se nezdařila. Zkontroluj připojení k internetu.", "Konzolák Servis");
+            return;
+        }
+        if (_nova == null && AktualizaceService.PosledniChyba != null)
+        {
+            _log.Zapis($"Aktualizace: {AktualizaceService.PosledniChyba}");
+            VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText} · aktualizace nedostupné";
+            VerzeInfo.ToolTip = AktualizaceService.PosledniChyba;
+            if (!tiše) MessageBox.Show($"Nové verze teď nejde zkontrolovat.\n\n{AktualizaceService.PosledniChyba}",
+                "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (_nova != null)
