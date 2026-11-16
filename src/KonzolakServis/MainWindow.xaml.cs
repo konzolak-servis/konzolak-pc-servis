@@ -20,6 +20,7 @@ public partial class MainWindow : Window
 
     private static readonly (Kategorie Kat, string Nazev)[] Sekce =
     {
+        (Kategorie.Prehled, "Přehled PC"),
         (Kategorie.Diagnostika, "Diagnostika"),
         (Kategorie.Optimalizace, "Optimalizace"),
         (Kategorie.Disky, "Disky"),
@@ -54,6 +55,10 @@ public partial class MainWindow : Window
     {
         Nadpis.Text = nazev;
         Akce.Children.Clear();
+        _zivy?.Stop();
+        var prehled = kat == Kategorie.Prehled;
+        AkceScroll.Visibility = prehled ? Visibility.Collapsed : Visibility.Visible;
+        if (prehled) { Nadpis.Text = $"Přehled PC – {Environment.MachineName}"; _ = ZobrazPrehledAsync(); return; }
         foreach (var a in ServisniKatalog.Vse.Where(a => a.Kategorie == kat))
         {
             var obsah = new StackPanel();
@@ -130,6 +135,98 @@ public partial class MainWindow : Window
         }
         if (s.Radky.Count == 0) z.Sekce.Remove(s);
         return z;
+    }
+
+    // ---------- Úvodní stránka: přehled PC ----------
+
+    private System.Windows.Threading.DispatcherTimer? _zivy;
+    private List<KartaPrehledu>? _karty;
+
+    private async Task ZobrazPrehledAsync()
+    {
+        ZalozkaVysledek.IsChecked = true;
+        VysledekPanel.Children.Clear();
+        VysledekPanel.Children.Add(new TextBlock { Text = "Načítám údaje o počítači…", Foreground = B("TextTlumeny"), FontSize = 14 });
+        try { _karty ??= await Task.Run(PrehledService.Nacti); }
+        catch (Exception ex)
+        {
+            VysledekPanel.Children.Clear();
+            VysledekPanel.Children.Add(new TextBlock { Text = $"Údaje se nepodařilo načíst: {ex.Message}", Foreground = B("Chyba") });
+            return;
+        }
+        if (Menu.Children.OfType<RadioButton>().FirstOrDefault()?.IsChecked != true) return;   // mezitím přepnuto jinam
+
+        _posledni = PrehledService.DoZpravy(_karty);
+        UlozitVysledek.IsEnabled = true;
+        VysledekPanel.Children.Clear();
+
+        // Živé dlaždice: procesor a paměť
+        var dlazdice = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var (cpuText, cpuBar) = Dlazdice(dlazdice, "Vytížení procesoru");
+        var (ramText, ramBar) = Dlazdice(dlazdice, "Využití paměti");
+        var (upText, _) = Dlazdice(dlazdice, "Běží od spuštění", bezPruhu: true);
+        VysledekPanel.Children.Add(dlazdice);
+
+        void Obnov()
+        {
+            var cpu = PrehledService.CpuProcent();
+            var (ramP, pouz, celk) = PrehledService.Pamet();
+            cpuText.Text = $"{cpu:0} %"; cpuBar.Value = cpu; cpuBar.Foreground = cpu > 85 ? B("Chyba") : B("Akcent");
+            ramText.Text = $"{ramP:0} %  ({pouz:0.0} / {celk:0.0} GB)"; ramBar.Value = ramP; ramBar.Foreground = ramP > 85 ? B("Chyba") : B("Akcent");
+            var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
+            upText.Text = $"{(int)up.TotalDays} d {up.Hours} h {up.Minutes} min";
+        }
+        PrehledService.CpuProcent();
+        Obnov();
+        _zivy = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+        _zivy.Tick += (_, _) => Obnov();
+        _zivy.Start();
+
+        // Karty s hardwarem
+        var mrizka = new WrapPanel();
+        foreach (var k in _karty) mrizka.Children.Add(Karta(k));
+        VysledekPanel.Children.Add(mrizka);
+
+        var obnovit = new Button { Content = "Načíst znovu", Style = (Style)FindResource("TlacitkoMale"), HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 0) };
+        obnovit.Click += async (_, _) => { _karty = null; _zivy?.Stop(); await ZobrazPrehledAsync(); };
+        VysledekPanel.Children.Add(obnovit);
+        StavText.Text = "Přehled načten. Uložit ho můžeš tlačítkem „Uložit výsledek…“.";
+    }
+
+    private (TextBlock Text, ProgressBar Bar) Dlazdice(Panel kam, string nadpis, bool bezPruhu = false)
+    {
+        var sp = new StackPanel();
+        sp.Children.Add(new TextBlock { Text = nadpis, Foreground = B("TextTlumeny"), FontSize = 12.5 });
+        var t = new TextBlock { FontSize = 22, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, 6) };
+        sp.Children.Add(t);
+        var bar = new ProgressBar { Height = 6, Maximum = 100, Background = B("Panel"), BorderThickness = new Thickness(0), Foreground = B("Akcent") };
+        if (!bezPruhu) sp.Children.Add(bar);
+        kam.Children.Add(new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 14),
+            Margin = new Thickness(0, 0, 12, 12), Width = 260, Child = sp });
+        return (t, bar);
+    }
+
+    private UIElement Karta(KartaPrehledu k)
+    {
+        var sp = new StackPanel();
+        sp.Children.Add(new TextBlock { Text = k.Nadpis.ToUpperInvariant(), Foreground = B("Akcent"), FontSize = 11.5, FontWeight = FontWeights.SemiBold });
+        sp.Children.Add(new TextBox { Text = k.Hlavni, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, IsReadOnly = true,
+            BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = B("Text"), Margin = new Thickness(0, 2, 0, 8) });
+        foreach (var (p, h, st) in k.Radky)
+        {
+            var g = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.Children.Add(new TextBlock { Text = p, Foreground = B("TextTlumeny"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap });
+            var hod = new TextBox { Text = h, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, IsReadOnly = true, BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent, Foreground = st is Stav.Chyba ? B("Chyba") : st is Stav.Varovani ? B("Varovani") : B("Text") };
+            Grid.SetColumn(hod, 1);
+            g.Children.Add(hod);
+            sp.Children.Add(g);
+        }
+        return new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 14),
+            Margin = new Thickness(0, 0, 12, 12), Width = 400, Child = sp };
     }
 
     // ---------- Vykreslení výsledku ----------

@@ -1,6 +1,6 @@
 namespace KonzolakServis.Models;
 
-public enum Kategorie { Diagnostika, Optimalizace, Disky, Opravy, Cisteni, HwInfo, Sit, Nastroje }
+public enum Kategorie { Prehled, Diagnostika, Optimalizace, Disky, Opravy, Cisteni, HwInfo, Sit, Nastroje }
 
 public enum Stav { Ok, Varovani, Chyba, Info }
 

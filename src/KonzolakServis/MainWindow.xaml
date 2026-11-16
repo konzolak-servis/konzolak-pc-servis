@@ -45,12 +45,12 @@
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
       <TextBlock x:Name="Nadpis" FontSize="24" FontWeight="SemiBold"/>
-      <ScrollViewer Grid.Row="1" Margin="0,16,0,4" MaxHeight="330" VerticalScrollBarVisibility="Auto">
+      <ScrollViewer x:Name="AkceScroll" Grid.Row="1" Margin="0,16,0,4" MaxHeight="330" VerticalScrollBarVisibility="Auto">
         <WrapPanel x:Name="Akce"/>
       </ScrollViewer>
 
       <!-- Přepínač: čitelný výsledek / podrobný log -->
-      <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
+      <StackPanel x:Name="Zalozky" Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
         <RadioButton x:Name="ZalozkaVysledek" Content="Výsledek" GroupName="pohled" IsChecked="True"
                      Style="{StaticResource Zalozka}" Checked="Pohled_Changed"/>
         <RadioButton x:Name="ZalozkaLog" Content="Podrobný log" GroupName="pohled"

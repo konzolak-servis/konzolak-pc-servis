@@ -1,3 +1,8 @@
+## 0.6
+- Nová úvodní stránka „Přehled PC“: systém, procesor, grafická karta (včetně skutečné velikosti paměti), operační paměť (typ DDR, takt, obsazené sloty, upozornění na single-channel), základní deska a BIOS/UEFI, disky (SSD/HDD, NVMe/SATA, stav), volné místo na oddílech, síť, baterie a teploty (kde je deska poskytuje).
+- Živé vytížení procesoru a paměti a doba běhu od posledního restartu (upozornění, když PC běží déle než 14 dní).
+- Přehled jde uložit tlačítkem „Uložit výsledek…“ do HTML nebo TXT.
+
 ## 0.5
 - Každé tlačítko nápravy teď ukáže výsledek: zelené nebo červené oznámení nahoře, u chyby i okno s vysvětlením.
 - Po nápravě se příslušná kontrola sama spustí znovu a ukáže nový výsledek se srovnáním „před nápravou / po nápravě“ (u Kompletní diagnostiky se celá diagnostika provede znovu).
