@@ -35,9 +35,9 @@ public sealed class LogService
         var path = Path.Combine(SlozkaLogu, $"servis_{Environment.MachineName}_{DateTime.Now:yyyy-MM-dd_HH-mm}.html");
         var html = $$"""
             <!doctype html><html lang="cs"><meta charset="utf-8"><title>Servisní protokol Konzolák</title>
-            <style>body{font-family:Segoe UI,sans-serif;background:#16181d;color:#e8eaed;padding:24px}
-            pre{font-family:Consolas,monospace;white-space:pre-wrap;background:#20232a;padding:16px;border-radius:8px}
-            h1{color:#3b82f6}</style>
+            <style>body{font-family:Segoe UI,sans-serif;background:#0F2038;color:#F1F3F7;padding:24px}
+            pre{font-family:Consolas,monospace;white-space:pre-wrap;background:#0B1A30;padding:16px;border-radius:8px}
+            h1{color:#C8992E}</style>
             <h1>Servisní protokol Konzolák</h1><pre>{{System.Net.WebUtility.HtmlEncode(Hlavicka() + Obsah)}}</pre></html>
             """;
         File.WriteAllText(path, html, new UTF8Encoding(true));
