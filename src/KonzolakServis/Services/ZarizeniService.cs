@@ -8,7 +8,7 @@ namespace KonzolakServis.Services;
 /// <summary>Zařízení s problémem ovladače (vykřičník ve Správci zařízení) a záloha ovladačů.</summary>
 public static class ZarizeniService
 {
-    private static string Kod(int k) => k switch
+    public static string Kod(int k) => k switch
     {
         1 => "Zařízení není správně nakonfigurované.",
         3 => "Ovladač je poškozený nebo je málo systémových prostředků.",
@@ -33,7 +33,7 @@ public static class ZarizeniService
         _ => $"Chyba zařízení (kód {k})."
     };
 
-    private static string Rada(int k) => k switch
+    public static string Rada(int k) => k switch
     {
         28 or 18 or 39 or 31 => "Stáhněte ovladač od výrobce zařízení / notebooku, nebo zkuste Windows Update → Volitelné aktualizace.",
         22 => "Pokud zařízení potřebujete, povolte ho ve Správci zařízení (pravé tlačítko → Povolit).",
@@ -93,4 +93,104 @@ public static class ZarizeniService
             }));
         return new VysledekAkce(z.Stav, z.Shrnuti) { Zprava = z };
     }
+
+    // ---------- Kompletní výpis zařízení (jako Správce zařízení) ----------
+
+    private static readonly Dictionary<string, string> Tridy = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AudioEndpoint"] = "Zvukové vstupy a výstupy", ["Battery"] = "Baterie", ["Biometric"] = "Biometrická zařízení",
+        ["Bluetooth"] = "Bluetooth", ["Camera"] = "Kamery", ["Computer"] = "Počítač", ["DiskDrive"] = "Diskové jednotky",
+        ["Display"] = "Grafické adaptéry", ["Firmware"] = "Firmware", ["HIDClass"] = "Zařízení standardu HID",
+        ["HDC"] = "Řadiče IDE ATA/ATAPI", ["Image"] = "Zobrazovací zařízení", ["Keyboard"] = "Klávesnice",
+        ["MEDIA"] = "Řadiče zvuku, videa a her", ["Monitor"] = "Monitory", ["Mouse"] = "Myši a jiná polohovací zařízení",
+        ["Net"] = "Síťové adaptéry", ["Ports"] = "Porty (COM a LPT)", ["PrintQueue"] = "Tiskové fronty", ["Printer"] = "Tiskárny",
+        ["Processor"] = "Procesory", ["SCSIAdapter"] = "Řadiče úložiště", ["SecurityDevices"] = "Zabezpečovací zařízení",
+        ["Sensor"] = "Senzory", ["SmartCardReader"] = "Čtečky čipových karet", ["SoftwareComponent"] = "Softwarové komponenty",
+        ["SoftwareDevice"] = "Softwarová zařízení", ["System"] = "Systémová zařízení", ["USB"] = "Řadiče USB",
+        ["USBDevice"] = "Zařízení USB", ["WPD"] = "Přenosná zařízení", ["MTD"] = "Paměťová zařízení", ["Extension"] = "Rozšíření ovladačů",
+        ["UCM"] = "Správci konektorů USB", ["Media"] = "Řadiče zvuku, videa a her", ["Infrared"] = "Infračervená zařízení",
+        ["Modem"] = "Modemy", ["SDHost"] = "Hostitelské adaptéry SD", ["NetService"] = "Síťové služby",
+    };
+
+    private static readonly HashSet<string> Skryte = new(StringComparer.OrdinalIgnoreCase) { "Volume", "VolumeSnapshot", "LegacyDriver", "" };
+
+    private sealed record Ovladac(string Poskytovatel, string Verze, string Datum, bool Podepsany, string Inf);
+
+    public static Task<Zprava> VypisAsync(IProgress<string> log, CancellationToken ct) => Task.Run(() =>
+    {
+        log.Report("Načítám ovladače…");
+        var ovladace = new Dictionary<string, Ovladac>(StringComparer.OrdinalIgnoreCase);
+        using (var q = new ManagementObjectSearcher("SELECT DeviceID, DriverProviderName, DriverVersion, DriverDate, IsSigned, InfName FROM Win32_PnPSignedDriver"))
+            foreach (var o in q.Get())
+            {
+                var id = o["DeviceID"] as string;
+                if (string.IsNullOrEmpty(id)) continue;
+                var datum = "";
+                try { datum = ManagementDateTimeConverter.ToDateTime((string)o["DriverDate"]).ToString("d. M. yyyy"); } catch { }
+                ovladace[id] = new Ovladac($"{o["DriverProviderName"]}", $"{o["DriverVersion"]}", datum, o["IsSigned"] is true, $"{o["InfName"]}");
+            }
+
+        log.Report("Načítám zařízení…");
+        var zarizeni = new List<(string Trida, string Nazev, string Vyrobce, int Kod, string Id, string Popis)>();
+        using (var q = new ManagementObjectSearcher("SELECT Name, PNPClass, Manufacturer, ConfigManagerErrorCode, DeviceID, Description FROM Win32_PnPEntity"))
+            foreach (var o in q.Get())
+            {
+                var trida = $"{o["PNPClass"]}";
+                if (Skryte.Contains(trida)) continue;
+                zarizeni.Add((trida, (o["Name"] as string) ?? (o["Description"] as string) ?? "Neznámé zařízení",
+                    $"{o["Manufacturer"]}", Convert.ToInt32(o["ConfigManagerErrorCode"] ?? 0), $"{o["DeviceID"]}", $"{o["Description"]}"));
+            }
+        log.Report($"Nalezeno {zarizeni.Count} zařízení.");
+
+        var z = new Zprava("Správce zařízení – kompletní výpis") { Obnovit = VypisAsync };
+        string Detail((string Trida, string Nazev, string Vyrobce, int Kod, string Id, string Popis) d)
+        {
+            var radky = new List<string>();
+            if (d.Kod != 0) { radky.Add($"Problém: {Kod(d.Kod)}"); radky.Add($"Řešení: {Rada(d.Kod)}"); }
+            if (ovladace.TryGetValue(d.Id, out var o))
+            {
+                radky.Add($"Ovladač: {o.Poskytovatel} · verze {o.Verze}" + (o.Datum.Length > 0 ? $" · {o.Datum}" : ""));
+                radky.Add($"Podpis: {(o.Podepsany ? "digitálně podepsaný" : "NEPODEPSANÝ")}" + (o.Inf.Length > 0 ? $" · {o.Inf}" : ""));
+            }
+            else radky.Add("Ovladač: nenainstalován nebo nelze zjistit");
+            radky.Add($"ID: {d.Id}");
+            return string.Join("\n", radky);
+        }
+        AkceRadku Otevrit() => new("Otevřít Správce zařízení", (_, _) =>
+        {
+            Process.Start(new ProcessStartInfo("devmgmt.msc") { UseShellExecute = true });
+            return Task.FromResult("Správce zařízení otevřen.");
+        });
+
+        var problemy = zarizeni.Where(d => d.Kod != 0).ToList();
+        if (problemy.Count > 0)
+        {
+            var sp = z.PridejSekci($"⚠ Zařízení s problémem ({problemy.Count})");
+            foreach (var d in problemy)
+                sp.Pridej(d.Nazev, NazevTridy(d.Trida), d.Kod is 22 or 45 ? Stav.Info : Stav.Chyba, Detail(d), Otevrit());
+        }
+
+        foreach (var g in zarizeni.GroupBy(d => NazevTridy(d.Trida)).OrderBy(g => g.Key, StringComparer.Create(new System.Globalization.CultureInfo("cs-CZ"), true)))
+        {
+            var chyb = g.Count(d => d.Kod != 0);
+            var s = z.PridejSekci($"{g.Key} ({g.Count()})" + (chyb > 0 ? $" – {chyb} s problémem" : ""));
+            s.Sbalena = chyb == 0;
+            foreach (var d in g.OrderBy(d => d.Nazev))
+            {
+                var vyr = d.Vyrobce.Length > 0 && !d.Vyrobce.StartsWith("(") ? d.Vyrobce : ovladace.TryGetValue(d.Id, out var o) ? o.Poskytovatel : "";
+                var stav = d.Kod == 0 ? (Stav?)null : d.Kod is 22 or 45 ? Stav.Info : Stav.Chyba;
+                s.Pridej(d.Nazev, vyr, stav, Detail(d));
+            }
+        }
+
+        var nepodepsane = ovladace.Values.Count(o => !o.Podepsany);
+        z.Stav = problemy.Any(d => d.Kod is not (22 or 45)) ? Stav.Chyba : Stav.Ok;
+        z.Shrnuti = $"{zarizeni.Count} zařízení v {zarizeni.Select(d => d.Trida).Distinct().Count()} kategoriích. " +
+                    (problemy.Count > 0 ? $"{problemy.Count} s problémem." : "Všechna fungují.") +
+                    (nepodepsane > 0 ? $" Nepodepsané ovladače: {nepodepsane}." : "") +
+                    " Kategorii rozbalíte kliknutím na její název.";
+        return z;
+    }, ct);
+
+    private static string NazevTridy(string t) => Tridy.TryGetValue(t, out var n) ? n : t.Length > 0 ? t : "Ostatní zařízení";
 }

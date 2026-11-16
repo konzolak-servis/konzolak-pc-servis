@@ -1,3 +1,9 @@
+## 0.8
+- Hardware → Výpis zařízení: všechna zařízení po kategoriích jako ve Správci zařízení (Baterie, Bluetooth, Klávesnice, Monitory, Síťové adaptéry…), kategorie se rozbalují kliknutím.
+- U každého zařízení výrobce, ovladač (poskytovatel, verze, datum), digitální podpis, INF soubor a ID zařízení.
+- Zařízení s problémem jsou nahoře, s vysvětlením chyby, postupem a tlačítkem Správce zařízení.
+- Výpis jde uložit do HTML/TXT (uloží se kompletně, včetně sbalených kategorií).
+
 ## 0.7
 - Karty na úvodní stránce mají tlačítko „Podrobnosti“ s kompletním výpisem.
 - Paměť RAM do detailu: každý modul zvlášť (slot, kanál, výrobce, part number, sériové číslo, kapacita, typ DDR, jmenovitý a aktuální takt, napětí, ECC), počet volných slotů, maximální podporovaná kapacita, režim single/dual-channel, kontrola XMP/EXPO a stejných modulů + doporučení.

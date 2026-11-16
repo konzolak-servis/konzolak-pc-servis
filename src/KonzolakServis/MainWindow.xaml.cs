@@ -295,15 +295,28 @@ public partial class MainWindow : Window
 
         foreach (var s in z.Sekce)
         {
-            VysledekPanel.Children.Add(new TextBlock { Text = s.Nadpis, FontSize = 16, FontWeight = FontWeights.SemiBold,
-                Foreground = B("Akcent"), Margin = new Thickness(0, 14, 0, 6) });
+            var tabulka = new StackPanel();
+            foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r, z));
+            var obal = new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12, 4, 12, 4), Child = tabulka, Visibility = s.Sbalena ? Visibility.Collapsed : Visibility.Visible };
+
+            var nadpis = new TextBlock { FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = B("Akcent"),
+                Margin = new Thickness(0, s.Sbalena ? 6 : 14, 0, 6), Text = (s.Sbalena ? "▸ " : "") + s.Nadpis };
+            if (s.Sbalena)
+            {
+                nadpis.Cursor = System.Windows.Input.Cursors.Hand;
+                nadpis.MouseLeftButtonUp += (_, _) =>
+                {
+                    var otevrit = obal.Visibility != Visibility.Visible;
+                    obal.Visibility = otevrit ? Visibility.Visible : Visibility.Collapsed;
+                    nadpis.Text = (otevrit ? "▾ " : "▸ ") + s.Nadpis;
+                };
+            }
+            VysledekPanel.Children.Add(nadpis);
             if (s.Popis.Length > 0)
                 VysledekPanel.Children.Add(new TextBlock { Text = s.Popis, TextWrapping = TextWrapping.Wrap, FontSize = 12.5,
                     Foreground = B("TextTlumeny"), Margin = new Thickness(0, 0, 0, 6) });
-            var tabulka = new StackPanel();
-            foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r, z));
-            VysledekPanel.Children.Add(new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(12, 4, 12, 4), Child = tabulka });
+            VysledekPanel.Children.Add(obal);
         }
         VysledekScroll.ScrollToTop();
     }

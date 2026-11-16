@@ -20,6 +20,8 @@ public sealed class SekceZpravy
     public SekceZpravy(string nadpis) => Nadpis = nadpis;
     public string Nadpis { get; }
     public string Popis { get; set; } = "";
+    /// <summary>Sekce se zobrazí sbalená – rozbalí se kliknutím na nadpis.</summary>
+    public bool Sbalena { get; set; }
     public List<Radek> Radky { get; } = new();
     public SekceZpravy Pridej(string popis, string hodnota = "", Stav? stav = null, string detail = "",
         params AkceRadku[] akce)

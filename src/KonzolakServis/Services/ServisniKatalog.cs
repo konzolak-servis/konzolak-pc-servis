@@ -171,6 +171,10 @@ public static class ServisniKatalog
 
         // ---------- HW INFO ----------
         new() {
+            Nazev = "Výpis zařízení (Správce zařízení)", Kategorie = Kategorie.HwInfo,
+            Popis = "Všechna zařízení po kategoriích: výrobce, ovladač (verze, datum, podpis), stav a problémy.",
+            Spustit = async (log, ct) => Vysl(await ZarizeniService.VypisAsync(log, ct)) },
+        new() {
             Nazev = "Přehled hardwaru", Kategorie = Kategorie.HwInfo,
             Popis = "Systém, procesor, paměť, deska, BIOS, grafika, disky, volné místo, síť.",
             Spustit = (log, _) => HardwareInfoService.ZpravaAsync(log) },
