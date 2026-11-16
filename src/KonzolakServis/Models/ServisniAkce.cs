@@ -4,7 +4,11 @@ public enum Kategorie { Diagnostika, Disky, Opravy, Cisteni, HwInfo, Sit }
 
 public enum Stav { Ok, Varovani, Chyba, Info }
 
-public sealed record VysledekAkce(Stav Stav, string Shrnuti);
+public sealed record VysledekAkce(Stav Stav, string Shrnuti)
+{
+    /// <summary>Strukturovaný výsledek pro zobrazení v aplikaci. Když chybí, zobrazí se výstup příkazu.</summary>
+    public Zprava? Zprava { get; init; }
+}
 
 /// <summary>Jedna servisní akce, kterou uživatel spustí tlačítkem.</summary>
 public sealed class ServisniAkce

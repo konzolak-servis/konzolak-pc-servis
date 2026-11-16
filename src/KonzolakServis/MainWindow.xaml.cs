@@ -1,9 +1,13 @@
 using System.Diagnostics;
+using System.IO;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using KonzolakServis.Models;
 using KonzolakServis.Services;
+using Microsoft.Win32;
 
 namespace KonzolakServis;
 
@@ -11,6 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly LogService _log = new();
     private CancellationTokenSource? _cts;
+    private Zprava? _posledni;
+    private List<string>? _zachyceno;   // výstup právě běžící akce (pro zobrazení v aplikaci)
 
     private static readonly (Kategorie Kat, string Nazev)[] Sekce =
     {
@@ -67,33 +73,194 @@ public partial class MainWindow : Window
         }
 
         _cts = new CancellationTokenSource();
+        _zachyceno = new List<string>();
         Prubeh.Visibility = Visibility.Visible; Zrusit.IsEnabled = true; Akce.IsEnabled = false;
         StavText.Text = $"Probíhá: {a.Nazev}…";
+        ZobrazPrubeh(a.Nazev);
         _log.Zapis($"===== {a.Nazev} =====");
-        var progress = new Progress<string>(_log.Zapis);
+        var zachyceno = _zachyceno;
+        var progress = new Progress<string>(l => { _log.Zapis(l); zachyceno.Add(l); });
+        Zprava zprava;
         try
         {
             var v = await Task.Run(() => a.Spustit(progress, _cts.Token));
-            _log.Zapis($"VÝSLEDEK [{PerfmonReportService.Popisek(v.Stav)}]: {v.Shrnuti}");
+            await Task.Delay(50);   // nechat doběhnout poslední řádky z Progress
+            _log.Zapis($"VÝSLEDEK [{ZpravaExport.StavText(v.Stav)}]: {v.Shrnuti}");
+            zprava = v.Zprava ?? ZVystupu(a.Nazev, v, zachyceno);
             StavText.Text = v.Shrnuti;
         }
-        catch (OperationCanceledException) { _log.Zapis("Akce přerušena uživatelem."); StavText.Text = "Přerušeno"; }
-        catch (Exception ex) { _log.Zapis($"CHYBA: {ex.Message}"); StavText.Text = "Chyba – viz log"; }
+        catch (OperationCanceledException)
+        {
+            _log.Zapis("Akce přerušena uživatelem.");
+            zprava = ZVystupu(a.Nazev, new VysledekAkce(Stav.Info, "Akce byla přerušena."), zachyceno);
+            StavText.Text = "Přerušeno";
+        }
+        catch (Exception ex)
+        {
+            _log.Zapis($"CHYBA: {ex.Message}");
+            zprava = ZVystupu(a.Nazev, new VysledekAkce(Stav.Chyba, $"Akce selhala: {ex.Message}"), zachyceno);
+            StavText.Text = "Chyba – podrobnosti v záložce Podrobný log";
+        }
         finally
         {
-            _cts.Dispose(); _cts = null;
+            _cts.Dispose(); _cts = null; _zachyceno = null;
             Prubeh.Visibility = Visibility.Collapsed; Zrusit.IsEnabled = false; Akce.IsEnabled = true;
         }
+        _posledni = zprava;
+        UlozitVysledek.IsEnabled = true;
+        Vykresli(zprava);
+        ZalozkaVysledek.IsChecked = true;
+    }
+
+    /// <summary>Akce bez vlastní zprávy: zobrazíme její výstup (bez technických řádků).</summary>
+    private static Zprava ZVystupu(string nazev, VysledekAkce v, List<string> radky)
+    {
+        var z = new Zprava(nazev) { Stav = v.Stav, Shrnuti = v.Shrnuti };
+        var s = z.PridejSekci("Výstup");
+        foreach (var r in radky)
+        {
+            var t = r.Trim();
+            if (t.Length == 0 || t.StartsWith("> ") || t.StartsWith("Návratový kód")) continue;
+            s.Pridej(t.TrimStart('!', ' '), "", t.StartsWith("!") ? Stav.Varovani : null);
+        }
+        if (s.Radky.Count == 0) z.Sekce.Remove(s);
+        return z;
+    }
+
+    // ---------- Vykreslení výsledku ----------
+
+    private Brush B(string klic) => (Brush)FindResource(klic);
+
+    private Brush BarvaStavu(Stav? s) => s switch
+    {
+        Stav.Ok => B("Ok"), Stav.Varovani => B("Varovani"), Stav.Chyba => B("Chyba"), Stav.Info => B("TextTlumeny"),
+        _ => Brushes.Transparent
+    };
+
+    private void ZobrazPrubeh(string nazev)
+    {
+        VysledekPanel.Children.Clear();
+        VysledekPanel.Children.Add(new TextBlock { Text = nazev, FontSize = 20, FontWeight = FontWeights.SemiBold });
+        VysledekPanel.Children.Add(new TextBlock { Text = "Probíhá… průběh najdeš v záložce Podrobný log.",
+            Foreground = B("TextTlumeny"), Margin = new Thickness(0, 6, 0, 0) });
+    }
+
+    private void Vykresli(Zprava z)
+    {
+        VysledekPanel.Children.Clear();
+        VysledekPanel.Children.Add(new TextBlock { Text = z.Nadpis, FontSize = 20, FontWeight = FontWeights.SemiBold });
+        VysledekPanel.Children.Add(new TextBlock { Text = $"{z.Pocitac} · {z.Cas:d. M. yyyy HH:mm}",
+            Foreground = B("TextTlumeny"), Margin = new Thickness(0, 2, 0, 10) });
+
+        VysledekPanel.Children.Add(new Border
+        {
+            Background = B("Pozadi"), BorderBrush = BarvaStavu(z.Stav), BorderThickness = new Thickness(5, 0, 0, 0),
+            CornerRadius = new CornerRadius(6), Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 0, 0, 8),
+            Child = new TextBlock { Text = z.Shrnuti, FontSize = 15, TextWrapping = TextWrapping.Wrap }
+        });
+
+        foreach (var s in z.Sekce)
+        {
+            VysledekPanel.Children.Add(new TextBlock { Text = s.Nadpis, FontSize = 16, FontWeight = FontWeights.SemiBold,
+                Foreground = B("Akcent"), Margin = new Thickness(0, 14, 0, 6) });
+            var tabulka = new StackPanel();
+            foreach (var r in s.Radky) tabulka.Children.Add(RadekUI(r));
+            VysledekPanel.Children.Add(new Border { Background = B("Pozadi"), CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12, 4, 12, 4), Child = tabulka });
+        }
+        VysledekScroll.ScrollToTop();
+    }
+
+    private UIElement RadekUI(Radek r)
+    {
+        var g = new Grid { Margin = new Thickness(0, 6, 0, 6) };
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = r.Hodnota.Length > 0 ? new GridLength(2, GridUnitType.Star) : new GridLength(1, GridUnitType.Star) });
+        if (r.Hodnota.Length > 0) g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+
+        if (r.Stav != null)
+            g.Children.Add(new Ellipse { Width = 10, Height = 10, Fill = BarvaStavu(r.Stav), VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 5, 0, 0) });
+
+        var levy = new StackPanel();
+        levy.Children.Add(new TextBox { Text = r.Popis, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+            Foreground = B("Text"), TextWrapping = TextWrapping.Wrap, FontSize = 14,
+            FontWeight = r.Hodnota.Length > 0 ? FontWeights.SemiBold : FontWeights.Normal });
+        if (r.Detail.Length > 0)
+            levy.Children.Add(new TextBox { Text = r.Detail, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+                Foreground = B("TextTlumeny"), TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(0, 3, 12, 0) });
+        Grid.SetColumn(levy, 1);
+        g.Children.Add(levy);
+
+        if (r.Hodnota.Length > 0)
+        {
+            var hodnota = new TextBox { Text = r.Hodnota, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+                Foreground = B("Text"), TextWrapping = TextWrapping.Wrap, FontSize = 14 };
+            Grid.SetColumn(hodnota, 2);
+            g.Children.Add(hodnota);
+        }
+        return g;
+    }
+
+    // ---------- Tlačítka ----------
+
+    private void Pohled_Changed(object s, RoutedEventArgs e)
+    {
+        if (Konzole == null || VysledekScroll == null) return;   // volá se už během InitializeComponent
+        var log = ZalozkaLog.IsChecked == true;
+        Konzole.Visibility = log ? Visibility.Visible : Visibility.Collapsed;
+        VysledekScroll.Visibility = log ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void Zrusit_Click(object s, RoutedEventArgs e) => _cts?.Cancel();
-    private void UlozTxt_Click(object s, RoutedEventArgs e) => Ulozeno(_log.UlozTxt());
-    private void UlozHtml_Click(object s, RoutedEventArgs e) => Ulozeno(_log.UlozHtml());
-    private void Ulozeno(string path) { _log.Zapis($"Log uložen: {path}"); StavText.Text = "Log uložen"; }
+
+    private void UlozVysledek_Click(object s, RoutedEventArgs e)
+    {
+        if (_posledni == null) return;
+        var nazev = Bezpecne($"{_posledni.Nadpis}_{_posledni.Pocitac}_{_posledni.Cas:yyyy-MM-dd_HH-mm}");
+        var cesta = ZeptejSeNaSoubor(nazev);
+        if (cesta == null) return;
+        ZpravaExport.Uloz(_posledni, cesta);
+        Ulozeno(cesta);
+    }
+
+    private void UlozLog_Click(object s, RoutedEventArgs e)
+    {
+        var cesta = ZeptejSeNaSoubor(Bezpecne($"Servisni_log_{Environment.MachineName}_{DateTime.Now:yyyy-MM-dd_HH-mm}"));
+        if (cesta == null) return;
+        _log.Uloz(cesta);
+        Ulozeno(cesta);
+    }
+
+    private static string? ZeptejSeNaSoubor(string nazev)
+    {
+        Directory.CreateDirectory(LogService.SlozkaLogu);
+        var dlg = new SaveFileDialog
+        {
+            Title = "Uložit jako",
+            FileName = nazev,
+            InitialDirectory = LogService.SlozkaLogu,
+            Filter = "Webová stránka – dá se otevřít i vytisknout (*.html)|*.html|Prostý text (*.txt)|*.txt",
+            AddExtension = true,
+        };
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
+    }
+
+    private void Ulozeno(string cesta)
+    {
+        _log.Zapis($"Uloženo: {cesta}");
+        StavText.Text = $"Uloženo: {System.IO.Path.GetFileName(cesta)}";
+        if (MessageBox.Show($"Soubor byl uložen:\n{cesta}\n\nOtevřít ho?", "Konzolák Servis",
+                MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+            Process.Start(new ProcessStartInfo(cesta) { UseShellExecute = true });
+    }
+
+    private static string Bezpecne(string s) =>
+        string.Concat(s.Select(c => System.IO.Path.GetInvalidFileNameChars().Contains(c) || c == ' ' ? '_' : c));
 
     private void OtevritLogy_Click(object s, RoutedEventArgs e)
     {
-        System.IO.Directory.CreateDirectory(LogService.SlozkaLogu);
+        Directory.CreateDirectory(LogService.SlozkaLogu);
         Process.Start(new ProcessStartInfo("explorer.exe", LogService.SlozkaLogu) { UseShellExecute = true });
     }
 }

@@ -59,6 +59,48 @@ public static class PerfmonReportService
         return new PerfmonZprava(slozka, File.Exists(html) ? html : null, v);
     }
 
+    /// <summary>Převod výsledku diagnostiky do čitelné zprávy pro aplikaci a export.</summary>
+    public static Zprava DoZpravy(PerfmonZprava pz)
+    {
+        var v = pz.Vysledek;
+        var z = new Zprava("Kompletní diagnostika systému");
+        var chyby = v.Zjisteni.Count(x => x.Zavaznost == Stav.Chyba) + v.Kontroly.Count(k => k.Stav == Stav.Chyba);
+        var varov = v.Zjisteni.Count(x => x.Zavaznost == Stav.Varovani) + v.Kontroly.Count(k => k.Stav == Stav.Varovani)
+                  + v.Prostredky.Count(q => q.Stav is Stav.Varovani or Stav.Chyba);
+        z.Stav = chyby > 0 ? Stav.Chyba : varov > 0 ? Stav.Varovani : Stav.Ok;
+        z.Shrnuti = chyby + varov == 0 ? "Diagnostika nenašla žádné problémy."
+                  : $"Diagnostika našla {chyby} {Tvar(chyby, "chybu", "chyby", "chyb")} a {varov} {Tvar(varov, "varování", "varování", "varování")}.";
+
+        var p = z.PridejSekci("Nalezené problémy");
+        foreach (var x in v.Zjisteni)
+        {
+            var det = new List<string>();
+            if (x.Pricina.Length > 0) det.Add($"Příčina: {x.Pricina}");
+            if (x.Podrobnosti.Length > 0) det.Add($"Podrobnosti: {x.Podrobnosti}");
+            if (x.TykaSe.Count > 0) det.Add($"Týká se: {string.Join(", ", x.TykaSe)}");
+            if (x.Reseni.Length > 0) det.Add($"Řešení: {x.Reseni}");
+            p.Pridej(x.Priznak, "", x.Zavaznost, string.Join("\n", det));
+        }
+        if (p.Radky.Count == 0) p.Pridej("Žádné problémy nenalezeny", "", Stav.Ok);
+
+        if (v.Kontroly.Count > 0)
+        {
+            var k = z.PridejSekci("Základní kontroly systému");
+            foreach (var x in v.Kontroly) k.Pridej(x.Nazev, x.Vysledek, x.Stav, x.Popis);
+        }
+        if (v.Prostredky.Count > 0)
+        {
+            var r = z.PridejSekci("Vytížení prostředků");
+            foreach (var x in v.Prostredky)
+                r.Pridej(x.Soucast, x.Procent.Length > 0 ? $"{x.Hodnoceni} ({x.Procent} %)" : x.Hodnoceni, x.Stav, x.Detail);
+        }
+        z.PridejSekci("Zpráva Windows").Pridej("Úplná zpráva perfmon", pz.HtmlCesta ?? pz.SlozkaZpravy);
+        return z;
+    }
+
+    private static string Tvar(int n, string jeden, string dva, string pet) =>
+        n == 1 ? jeden : n is >= 2 and <= 4 ? dva : pet;
+
     /// <summary>Čitelný textový výpis výsledku (do konzole aplikace a do logu).</summary>
     public static IEnumerable<string> Vypis(VysledekDiagnostiky v)
     {

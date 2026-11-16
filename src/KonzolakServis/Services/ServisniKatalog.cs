@@ -21,12 +21,8 @@ public static class ServisniKatalog
             Popis = "Spustí perfmon /report, počká na zprávu a vypíše nalezené chyby a varování.",
             Spustit = async (log, ct) => {
                 var z = await PerfmonReportService.VytvorAsync(log, ct);
-                var v = z.Vysledek;
-                var chyby = v.Zjisteni.Count(x => x.Zavaznost == Stav.Chyba) + v.Kontroly.Count(k => k.Stav == Stav.Chyba);
-                var varov = v.Zjisteni.Count(x => x.Zavaznost == Stav.Varovani) + v.Kontroly.Count(k => k.Stav == Stav.Varovani)
-                          + v.Prostredky.Count(p => p.Stav != Stav.Ok && p.Stav != Stav.Info);
-                return new(chyby > 0 ? Stav.Chyba : varov > 0 ? Stav.Varovani : Stav.Ok,
-                           $"Diagnostika: {chyby} chyb, {varov} varování");
+                var zprava = PerfmonReportService.DoZpravy(z);
+                return new(zprava.Stav, zprava.Shrnuti) { Zprava = zprava };
             }},
         new() {
             Nazev = "Index spolehlivosti a pády", Kategorie = Kategorie.Diagnostika,
@@ -43,13 +39,8 @@ public static class ServisniKatalog
                 log, ct), "Hotovo", "Nelze zjistit") },
         new() {
             Nazev = "Zpráva o baterii", Kategorie = Kategorie.Diagnostika,
-            Popis = "U notebooků: opotřebení baterie (powercfg /batteryreport).",
-            Spustit = async (log, ct) => {
-                var path = Path.Combine(LogService.SlozkaLogu, $"baterie_{DateTime.Now:yyyy-MM-dd_HH-mm}.html");
-                Directory.CreateDirectory(LogService.SlozkaLogu);
-                return Z(await ProcessRunner.RunAsync("powercfg.exe", $"/batteryreport /output \"{path}\"", log, ct),
-                    $"Zpráva uložena: {path}", "Baterie nenalezena");
-            }},
+            Popis = "U notebooků: zdraví baterie, kapacita a počet cyklů.",
+            Spustit = BatteryService.ZpravaAsync },
 
         // ---------- DISKY ----------
         new() {
@@ -152,8 +143,8 @@ public static class ServisniKatalog
         // ---------- HW INFO ----------
         new() {
             Nazev = "Přehled hardwaru", Kategorie = Kategorie.HwInfo,
-            Popis = "Procesor, paměť, deska, BIOS, grafika, disky, síť, baterie.",
-            Spustit = async (log, _) => { await HardwareInfoService.VypisAsync(log); return new(Stav.Ok, "HW info načteno"); } },
+            Popis = "Systém, procesor, paměť, deska, BIOS, grafika, disky, volné místo, síť.",
+            Spustit = (log, _) => HardwareInfoService.ZpravaAsync(log) },
     };
 
     private static long SmazObsah(string dir, IProgress<string> log, CancellationToken ct)

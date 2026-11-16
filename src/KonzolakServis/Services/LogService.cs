@@ -21,27 +21,23 @@ public sealed class LogService
 
     public string Obsah { get { lock (_buf) return _buf.ToString(); } }
 
-    public string UlozTxt()
+    /// <summary>Uloží celý podrobný log do souboru (TXT nebo HTML podle přípony).</summary>
+    public void Uloz(string path)
     {
-        Directory.CreateDirectory(SlozkaLogu);
-        var path = Path.Combine(SlozkaLogu, $"servis_{Environment.MachineName}_{DateTime.Now:yyyy-MM-dd_HH-mm}.txt");
-        File.WriteAllText(path, Hlavicka() + Obsah, new UTF8Encoding(true));
-        return path;
-    }
-
-    public string UlozHtml()
-    {
-        Directory.CreateDirectory(SlozkaLogu);
-        var path = Path.Combine(SlozkaLogu, $"servis_{Environment.MachineName}_{DateTime.Now:yyyy-MM-dd_HH-mm}.html");
+        var text = Hlavicka() + Obsah;
+        if (Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase))
+        {
+            File.WriteAllText(path, text, new UTF8Encoding(true));
+            return;
+        }
         var html = $$"""
             <!doctype html><html lang="cs"><meta charset="utf-8"><title>Servisní protokol Konzolák</title>
             <style>body{font-family:Segoe UI,sans-serif;background:#0F2038;color:#F1F3F7;padding:24px}
             pre{font-family:Consolas,monospace;white-space:pre-wrap;background:#0B1A30;padding:16px;border-radius:8px}
             h1{color:#C8992E}</style>
-            <h1>Servisní protokol Konzolák</h1><pre>{{System.Net.WebUtility.HtmlEncode(Hlavicka() + Obsah)}}</pre></html>
+            <h1>Servisní protokol Konzolák</h1><pre>{{System.Net.WebUtility.HtmlEncode(text)}}</pre></html>
             """;
         File.WriteAllText(path, html, new UTF8Encoding(true));
-        return path;
     }
 
     private static string Hlavicka() =>

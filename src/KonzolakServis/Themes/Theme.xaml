@@ -57,6 +57,36 @@
     </Setter>
   </Style>
 
+  <!-- Menší tlačítko pro spodní lištu -->
+  <Style TargetType="Button" x:Key="TlacitkoMale" BasedOn="{StaticResource TlacitkoAkce}">
+    <Setter Property="MinWidth" Value="0"/>
+    <Setter Property="Padding" Value="14,8"/>
+    <Setter Property="Margin" Value="8,0,0,0"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
+
+  <!-- Záložky Výsledek / Podrobný log -->
+  <Style TargetType="RadioButton" x:Key="Zalozka">
+    <Setter Property="Foreground" Value="{StaticResource TextTlumeny}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Border x:Name="b" Padding="4,6" Margin="0,0,20,0" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource Akcent}"/>
+              <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType="RadioButton" x:Key="PolozkaMenu">
     <Setter Property="Foreground" Value="{StaticResource TextTlumeny}"/>
     <Setter Property="FontSize" Value="15"/>
