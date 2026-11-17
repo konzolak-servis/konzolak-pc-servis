@@ -1,3 +1,8 @@
+## 0.12
+- Benchmark PC: notebooky se dvěma grafikami (např. Intel Arc + NVIDIA RTX) – každá grafika se testuje zvlášť s vynucenou volbou výkonné / úsporné karty (nastavení Windows se po testu vrátí). U výsledku je vždy uvedeno, která karta byla testována, propustnost její video paměti a porovnání s obvyklými výsledky pro každou kartu.
+- Odstraněno zavádějící „herní“ skóre WinSAT (novější Windows ho vždy hlásí jako 9,9).
+- Pruhy u skóre a rychlostí jsou v barvách aplikace (zelená / žlutá / červená podle hodnocení, jinak zlatá), i v uloženém HTML.
+
 ## 0.11
 - Nový Benchmark PC (Diagnostika): vlastní test procesoru na jednom jádře i všech jádrech + test Windows WinSAT (procesor, paměť RAM, grafika, disk) se skóre 1,0–9,9 a hodnocením slabé / průměrné / dobré / výborné.
 - Porovnání s obvyklými výsledky podle hardwaru (třída procesoru, typ paměti DDR3/4/5, typ disku HDD/SSD/NVMe, integrovaná nebo samostatná grafika) s možnými příčinami, když je výsledek pod očekáváním. Tlačítko „Porovnat na internetu“ pro konkrétní model.

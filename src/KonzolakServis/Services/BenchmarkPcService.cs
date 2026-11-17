@@ -61,6 +61,20 @@ public static class BenchmarkPcService
 
         var winsat = xml != null ? Nacti(xml) : null;
 
+        // ---------- 3) každá grafická karta zvlášť (notebooky s hybridní grafikou) ----------
+        var gpuTesty = new List<TestGpu>();
+        var grafiky = BenchmarkSrovnani.Grafiky();
+        if (!baterie && grafiky.Count >= 2)
+        {
+            log.Report($"Nalezeny {grafiky.Count} grafiky: {string.Join(", ", grafiky)} – testuji každou zvlášť…");
+            foreach (var (pref, rezim) in new[] { (2, "výkonná"), (1, "úsporná") })
+            {
+                ct.ThrowIfCancellationRequested();
+                var t = await TestujGpuAsync(pref, rezim, log, ct);
+                if (t != null) gpuTesty.Add(t);
+            }
+        }
+
         // ---------- výsledek ----------
         var c = z.PridejSekci("Procesor – vlastní test Konzolák");
         c.Popis = "Výpočetní test (celá čísla + desetinná čísla) po 3 s. Čím vyšší číslo, tím rychlejší procesor.";
@@ -80,19 +94,21 @@ public static class BenchmarkPcService
             void Skore(string nazev, double hodnota, string vysvetleni)
             {
                 if (hodnota <= 0) return;
-                s.Pridej(nazev, $"{hodnota:0.0} / 9,9 – {Slovne(hodnota)}  {Pruh(hodnota)}", StavSkore(hodnota), vysvetleni);
+                s.PridejPruh(nazev, $"{hodnota:0.0} / 9,9 – {Slovne(hodnota)}", hodnota / 9.9, StavSkore(hodnota), vysvetleni);
             }
             Skore("Procesor", winsat.Cpu, "Výpočty, komprese, šifrování.");
             Skore("Paměť RAM", winsat.Pamet, "Propustnost operační paměti.");
-            Skore("Grafika (pracovní plocha)", winsat.Grafika, "Plynulost Windows, videa a oken.");
-            Skore("Grafika (hry, 3D)", winsat.Hry, "Orientační 3D výkon – pro hry rozhodují spíše konkrétní hry a ovladač.");
+            Skore("Grafika" + (winsat.Adapter.Length > 0 ? $" – {winsat.Adapter}" : ""), winsat.Grafika,
+                "Plynulost Windows, videa a oken. Testována grafika, kterou Windows použil pro tento test" + (winsat.Adapter.Length > 0 ? $": {winsat.Adapter}." : "."));
             Skore("Systémový disk", winsat.Disk, "Rychlost startu Windows a programů.");
 
             var nejslabsi = new[] { ("procesor", winsat.Cpu), ("paměť RAM", winsat.Pamet), ("grafika", winsat.Grafika), ("disk", winsat.Disk) }
                 .Where(x => x.Item2 > 0).OrderBy(x => x.Item2).FirstOrDefault();
             var celkem = winsat.Celkem > 0 ? winsat.Celkem : nejslabsi.Item2;
             s.Radky.Insert(0, new Radek("Celkové skóre PC", $"{celkem:0.0} / 9,9 – {Slovne(celkem)}", StavSkore(celkem),
-                nejslabsi.Item1 != null ? $"Nejslabší část: {nejslabsi.Item1} ({nejslabsi.Item2:0.0})." : ""));
+                nejslabsi.Item1 != null ? $"Nejslabší část: {nejslabsi.Item1} ({nejslabsi.Item2:0.0})." : "") { Pruh = Math.Clamp(celkem / 9.9, 0.02, 1) });
+
+            if (grafiky.Count >= 2) PridejGpuSekci(z, grafiky, gpuTesty);
 
             if (winsat.Metriky.Count > 0)
             {
@@ -138,8 +154,12 @@ public static class BenchmarkPcService
                 "přehřívání (prach, pasta), úsporný režim napájení, notebook na baterii, programy na pozadí, starší generace procesoru.", hw.Procesor);
             BenchmarkSrovnani.Porovnej(p, $"Paměť RAM – {hw.TypRam}", winsat.Pamet, BenchmarkSrovnani.TypickaPamet(hw.TypRam),
                 "paměť jen v jednom kanálu (jeden modul), nízký takt, vypnutý XMP/EXPO v BIOSu.");
-            BenchmarkSrovnani.Porovnej(p, $"Grafika – {hw.Grafika}", winsat.Grafika, BenchmarkSrovnani.TypickaGrafika(hw.SamostatnaGrafika),
-                "starý nebo obecný ovladač grafiky, notebook používá integrovanou grafiku místo výkonné, úsporný režim.", hw.Grafika);
+            var testGpu = winsat.Adapter.Length > 0 ? winsat.Adapter : hw.Grafika;
+            BenchmarkSrovnani.Porovnej(p, $"Grafika – {testGpu}", winsat.Grafika, BenchmarkSrovnani.TypickaGrafika(BenchmarkSrovnani.Samostatna(testGpu)),
+                "starý nebo obecný ovladač grafiky, notebook používá integrovanou grafiku místo výkonné, úsporný režim.", testGpu);
+            foreach (var g in gpuTesty.Where(x => x.Skore > 0 && !string.Equals(x.Adapter, testGpu, StringComparison.OrdinalIgnoreCase)))
+                BenchmarkSrovnani.Porovnej(p, $"Grafika – {g.Adapter}", g.Skore, BenchmarkSrovnani.TypickaGrafika(BenchmarkSrovnani.Samostatna(g.Adapter)),
+                    "starý ovladač grafiky, úsporný režim napájení, notebook na baterii.", g.Adapter);
             BenchmarkSrovnani.Porovnej(p, $"Systémový disk – {hw.Disk}", winsat.Disk, BenchmarkSrovnani.TypickyDisk(hw.TypDisku),
                 "téměř plný disk, opotřebení nebo vadná místa (viz Disky → Kvalita), řadič v režimu IDE místo AHCI, pomalý slot.", hw.Disk);
             if (p.Radky.Count == 0) z.Sekce.Remove(p);
@@ -154,6 +174,81 @@ public static class BenchmarkPcService
         return z;
     }
 
+    private sealed record TestGpu(string Rezim, string Adapter, double Skore, double Plocha, double PametMBs, List<(string, string)> Metriky);
+
+    /// <summary>
+    /// Spustí grafický test WinSAT s vynucenou grafikou (Nastavení → Grafika = HKCU\…\DirectX\UserGpuPreferences,
+    /// 1 = úsporná, 2 = výkonná). Původní nastavení se vždy vrátí.
+    /// </summary>
+    private static async Task<TestGpu?> TestujGpuAsync(int pref, string rezim, IProgress<string> log, CancellationToken ct)
+    {
+        const string Klic = @"Software\Microsoft\DirectX\UserGpuPreferences";
+        var exe = Path.Combine(Environment.SystemDirectory, "winsat.exe");
+        using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(Klic);
+        var puvodni = k?.GetValue(exe) as string;
+        try
+        {
+            k?.SetValue(exe, $"GpuPreference={pref};");
+            log.Report($"Test grafiky – {rezim} karta…");
+            var start = DateTime.Now;
+            await ProcessRunner.RunAsync("winsat.exe", "graphicsformal", log, ct);
+            var cesta = NejnovejsiXml(start, "*.WinSAT.xml");
+            if (cesta == null) return null;
+            var w = Nacti(cesta);
+            if (w == null) return null;
+            double Cislo(string jmeno) => w.Metriky.Where(m => m.Nazev == jmeno).Select(m =>
+                double.TryParse(m.Hodnota.Split(' ')[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out var v) ? v : 0)
+                .FirstOrDefault();
+            var vysledek = new TestGpu(rezim, w.Adapter.Length > 0 ? w.Adapter : $"{rezim} grafika", w.Grafika,
+                Cislo(NazvyMetrik["DWMFps"]), Cislo(NazvyMetrik["VideoMemBandwidth"]), w.Metriky);
+            log.Report($"Testováno: {vysledek.Adapter} · skóre {vysledek.Skore:0.0}");
+            return vysledek;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { log.Report($"! Test grafiky ({rezim}) selhal: {ex.Message}"); return null; }
+        finally
+        {
+            try
+            {
+                if (puvodni == null) k?.DeleteValue(exe, false);
+                else k?.SetValue(exe, puvodni);
+            }
+            catch { }
+        }
+    }
+
+    private static void PridejGpuSekci(Zprava z, List<string> grafiky, List<TestGpu> testy)
+    {
+        var g = z.PridejSekci("Grafické karty – každá zvlášť");
+        g.Popis = $"Počítač má {grafiky.Count} grafiky ({string.Join(", ", grafiky)}). Windows pro běžnou práci používá úspornou a výkonnou zapíná "
+            + "jen pro náročné programy. Test proto proběhl dvakrát s vynucenou volbou grafiky (nastavení se po testu vrátilo).";
+        if (testy.Count == 0)
+        {
+            g.Pridej("Test jednotlivých grafik se nepodařil", "", Stav.Varovani, "Podrobnosti jsou v záložce Podrobný log.");
+            return;
+        }
+        var maxPamet = testy.Max(t => t.PametMBs);
+        foreach (var t in testy)
+        {
+            var detail = $"Režim Windows: {t.Rezim} grafika."
+                + (t.Plocha > 0 ? $" Vykreslování plochy: {t.Plocha:0} snímků/s." : "")
+                + (t.PametMBs > 0 ? $" Propustnost video paměti: {t.PametMBs / 1000:0.#} GB/s." : "");
+            if (t.Skore > 0)
+                g.PridejPruh(t.Adapter, $"{t.Skore:0.0} / 9,9 – {Slovne(t.Skore)}", t.Skore / 9.9, StavSkore(t.Skore), detail);
+            else
+                g.Pridej(t.Adapter, "otestováno", Stav.Info, detail);
+            if (t.PametMBs > 0 && maxPamet > 0)
+                g.PridejPruh($"   video paměť – {t.Adapter}", $"{t.PametMBs / 1000:0.#} GB/s", t.PametMBs / maxPamet, null,
+                    "Rychlost paměti grafiky – hlavní rozdíl mezi integrovanou a samostatnou kartou.");
+        }
+        if (testy.Count >= 2 && string.Equals(testy[0].Adapter, testy[1].Adapter, StringComparison.OrdinalIgnoreCase))
+            g.Pridej("Windows použil v obou testech stejnou grafiku", "", Stav.Info,
+                "Druhou kartu se nepodařilo vynutit – notebook má nejspíš grafiku přepnutou napevno (MUX / „pouze dedikovaná GPU“ v BIOSu nebo aplikaci výrobce). "
+                + "V tom případě je testovaná karta ta, která skutečně běží.");
+        g.Pridej("Herní výkon", "", null,
+            "Test Windows měří plochu a propustnost paměti grafiky, ne herní 3D výkon. Ten ukáže až test ve hře nebo specializovaný 3D benchmark.");
+    }
+
     private static string Slovne(double s) => s switch
     {
         >= 8.5 => "výborné", >= 7 => "dobré", >= 5 => "průměrné", _ => "slabé"
@@ -161,7 +256,6 @@ public static class BenchmarkPcService
 
     private static Stav StavSkore(double s) => s >= 7 ? Stav.Ok : s >= 5 ? Stav.Info : Stav.Varovani;
 
-    private static string Pruh(double s) => new string('█', (int)Math.Clamp(Math.Round(s * 2), 1, 20));
 
     /// <summary>Výpočetní smyčka – celá čísla (xorshift) i desetinná čísla. Vrací miliony iterací za sekundu.</summary>
     private static double MerCpu(int vlaken, CancellationToken ct)
@@ -190,13 +284,13 @@ public static class BenchmarkPcService
         return celkem / sw.Elapsed.TotalSeconds / 1e6;
     }
 
-    private static string? NejnovejsiXml(DateTime po)
+    private static string? NejnovejsiXml(DateTime po, string maska = "*Formal.Assessment*.WinSAT.xml")
     {
         try
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Performance", "WinSAT", "DataStore");
             if (!Directory.Exists(dir)) return null;
-            return new DirectoryInfo(dir).GetFiles("*Formal.Assessment*.WinSAT.xml")
+            return new DirectoryInfo(dir).GetFiles(maska)
                 .Where(f => f.LastWriteTime >= po)
                 .OrderByDescending(f => f.LastWriteTime).FirstOrDefault()?.FullName;
         }
@@ -204,7 +298,7 @@ public static class BenchmarkPcService
     }
 
     private sealed record WinSat(double Celkem, double Cpu, double Pamet, double Grafika, double Hry, double Disk,
-        List<(string Nazev, string Hodnota)> Metriky);
+        List<(string Nazev, string Hodnota)> Metriky, string Adapter);
 
     private static readonly Dictionary<string, string> NazvyMetrik = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -252,7 +346,8 @@ public static class BenchmarkPcService
                     if (nazev != null) metriky.Add((nazev, $"{v:0.##} {jednotky}".Trim()));
                 }
             }
-            return new WinSat(D("SystemScore"), D("CpuScore"), D("MemoryScore"), D("GraphicsScore"), D("GamingScore"), D("DiskScore"), metriky);
+            var adapter = doc.Descendants("AdapterDescription").FirstOrDefault()?.Value.Trim() ?? "";
+            return new WinSat(D("SystemScore"), D("CpuScore"), D("MemoryScore"), D("GraphicsScore"), D("GamingScore"), D("DiskScore"), metriky, adapter);
         }
         catch { return null; }
     }

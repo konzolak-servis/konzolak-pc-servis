@@ -100,7 +100,7 @@ public static class ZpravaExport
                 var det = r.Detail.Length > 0 ? $"<div class=\"det\">{E(r.Detail)}</div>" : "";
                 sb.Append($"<tr><td class=\"d\"><span class=\"dot\" style=\"background:{Barva(r.Stav)}\"></span></td>");
                 if (r.Hodnota.Length > 0)
-                    sb.Append($"<td class=\"p\">{E(r.Popis)}{det}</td><td>{E(r.Hodnota)}</td></tr>");
+                    sb.Append($"<td class=\"p\">{E(r.Popis)}{det}</td><td>{E(r.Hodnota)}{PruhHtml(r)}</td></tr>");
                 else
                     sb.Append($"<td colspan=\"2\">{E(r.Popis)}{det}</td></tr>");
             }
@@ -109,6 +109,11 @@ public static class ZpravaExport
         sb.Append("<footer>Vytvořeno aplikací Konzolák Servis</footer></div></body></html>");
         return sb.ToString();
     }
+
+    private static string PruhHtml(Radek r) => r.Pruh is not { } p ? "" :
+        $"<div style=\"background:#0F2038;border-radius:4px;height:8px;margin-top:6px;max-width:420px\"><div style=\"height:8px;border-radius:4px;width:{p * 100:0.#}%;background:"
+        + (r.Stav switch { Models.Stav.Ok => "#22C55E", Models.Stav.Varovani => "#F59E0B", Models.Stav.Chyba => "#EF4444", _ => "#C8992E" })
+        + "\"></div></div>";
 
     private static string Logo()
     {

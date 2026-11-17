@@ -74,7 +74,13 @@ public static class BenchmarkSrovnani
         return new Hw(cpu, gpu, Samostatna(gpu), typ, typDisku, disk?.Nazev ?? "");
     }
 
-    private static bool Samostatna(string gpu) =>
+    /// <summary>Všechny skutečné grafiky (bez virtuálních a vzdálených adaptérů).</summary>
+    public static List<string> Grafiky() => Wmi("SELECT Name FROM Win32_VideoController").Select(g => S(g["Name"]))
+        .Where(n => n.Length > 0 && !new[] { "Basic", "Remote", "Virtual", "Parsec", "Meta", "Citrix", "VNC", "DisplayLink", "Hyper-V" }
+            .Any(x => n.Contains(x, StringComparison.OrdinalIgnoreCase)))
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderByDescending(Samostatna).ToList();
+
+    public static bool Samostatna(string gpu) =>
         new[] { "GeForce", "RTX", "GTX", "Quadro", "Radeon RX", "Radeon Pro", "Arc A", "Arc B", "FirePro" }
             .Any(k => gpu.Contains(k, StringComparison.OrdinalIgnoreCase));
 

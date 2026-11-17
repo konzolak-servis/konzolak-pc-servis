@@ -395,8 +395,25 @@ public partial class MainWindow : Window
         {
             var hodnota = new TextBox { Text = r.Hodnota, IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
                 Foreground = B("Text"), TextWrapping = TextWrapping.Wrap, FontSize = 14 };
-            Grid.SetColumn(hodnota, 2);
-            g.Children.Add(hodnota);
+            UIElement prava = hodnota;
+            if (r.Pruh is { } podil)
+            {
+                // barevný pruh v barvách aplikace: zelená/žlutá/červená podle stavu, jinak zlatá
+                var pruh = new Grid { Height = 8, Margin = new Thickness(2, 5, 24, 0), MaxWidth = 420, HorizontalAlignment = HorizontalAlignment.Stretch };
+                pruh.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(podil, GridUnitType.Star) });
+                pruh.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.0001, 1 - podil), GridUnitType.Star) });
+                var stopa = new Border { Background = B("Panel"), CornerRadius = new CornerRadius(4) };
+                Grid.SetColumnSpan(stopa, 2);
+                pruh.Children.Add(stopa);
+                pruh.Children.Add(new Border { CornerRadius = new CornerRadius(4),
+                    Background = r.Stav is Stav.Ok or Stav.Varovani or Stav.Chyba ? BarvaStavu(r.Stav) : B("Akcent") });
+                var sp = new StackPanel();
+                sp.Children.Add(hodnota);
+                sp.Children.Add(pruh);
+                prava = sp;
+            }
+            Grid.SetColumn(prava, 2);
+            g.Children.Add(prava);
         }
         return g;
     }

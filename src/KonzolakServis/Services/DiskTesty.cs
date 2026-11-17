@@ -189,9 +189,6 @@ public static partial class DiskService
         return new VysledekAkce(z.Stav, z.Shrnuti) { Zprava = z };
     }
 
-    private static string Pruh(double hodnota, double max) =>
-        new string('█', (int)Math.Clamp(Math.Round(hodnota / Math.Max(max, 0.001) * 20), 1, 20));
-
     private static Zprava Benchmark(InfoDisku d, IProgress<string> log, CancellationToken ct)
     {
         const int VelkyBlok = 4 * 1024 * 1024;
@@ -295,7 +292,7 @@ public static partial class DiskService
         var s = z.PridejSekci("Sekvenční čtení (velké soubory)");
         s.Popis = "Čtení 512 MB na pěti místech disku. U HDD je konec disku přirozeně pomalejší než začátek.";
         foreach (var (kde, mbs) in sekv)
-            s.Pridej(kde, $"{mbs,6:0} MB/s  {Pruh(mbs, maxSek)}", mbs < ocekCteni * 0.6 ? Stav.Varovani : Stav.Ok);
+            s.PridejPruh(kde, $"{mbs:0} MB/s", mbs / Math.Max(maxSek, 0.001), mbs < ocekCteni * 0.6 ? Stav.Varovani : Stav.Ok);
         s.Pridej("Průměr", $"{prumer:0} MB/s", prumer < ocekCteni * 0.6 ? Stav.Varovani : Stav.Ok, typText);
 
         var p = z.PridejSekci("Přístupová doba a malé soubory");
@@ -306,7 +303,7 @@ public static partial class DiskService
         var w = z.PridejSekci("Zápis");
         w.Popis = zapisInfo;
         if (zapisMBs is { } zm)
-            w.Pridej("Sekvenční zápis", $"{zm,6:0} MB/s  {Pruh(zm, maxSek)}", zm < ocekCteni * 0.4 ? Stav.Varovani : Stav.Ok,
+            w.PridejPruh("Sekvenční zápis", $"{zm:0} MB/s", zm / Math.Max(maxSek, 0.001), zm < ocekCteni * 0.4 ? Stav.Varovani : Stav.Ok,
                 d.Ssd ? "U SSD může zápis po zaplnění rychlé mezipaměti (SLC cache) klesnout – to je normální." : "");
         if (zapis4kMs is { } z4)
             w.Pridej("Náhodný zápis 4 KB", $"{z4:0.00} ms · {1000 / z4:N0} operací/s", z4 > ocekPristup * 4 ? Stav.Varovani : Stav.Ok);

@@ -13,6 +13,8 @@ public sealed record AkceRadku(string Text, Func<IProgress<string>, Cancellation
 public sealed record Radek(string Popis, string Hodnota = "", Stav? Stav = null, string Detail = "")
 {
     public IReadOnlyList<AkceRadku> Akce { get; init; } = Array.Empty<AkceRadku>();
+    /// <summary>Volitelný barevný pruh pod hodnotou (0–1), barva podle stavu.</summary>
+    public double? Pruh { get; init; }
 }
 
 /// <summary>Jeden čtvereček mapy povrchu disku: stav a popisek (oblast, doba čtení).</summary>
@@ -32,6 +34,13 @@ public sealed class SekceZpravy
         params AkceRadku[] akce)
     {
         Radky.Add(new Radek(popis, hodnota, stav, detail) { Akce = akce });
+        return this;
+    }
+
+    /// <summary>Řádek s barevným pruhem (podíl 0–1), např. skóre nebo rychlost.</summary>
+    public SekceZpravy PridejPruh(string popis, string hodnota, double podil, Stav? stav = null, string detail = "")
+    {
+        Radky.Add(new Radek(popis, hodnota, stav, detail) { Pruh = Math.Clamp(podil, 0.02, 1) });
         return this;
     }
 }
