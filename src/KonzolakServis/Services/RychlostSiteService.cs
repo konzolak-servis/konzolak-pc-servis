@@ -43,22 +43,51 @@ public static class RychlostSiteService
 
         var pripojeni = z.PridejSekci("Připojení");
         var wifi = await WifiAsync(ct);
-        var adapter = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback
-                        && n.GetIPProperties().GatewayAddresses.Count > 0)
-            .OrderByDescending(n => n.Speed).FirstOrDefault();
+        var adapter = AdapterInternetu();
+        var pres_wifi = adapter?.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
         if (adapter != null)
-            pripojeni.Pridej("Aktivní adaptér", $"{adapter.Description}", null,
-                $"Typ: {(adapter.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? "Wi-Fi" : "kabel / jiné")} · rychlost spojení: {adapter.Speed / 1_000_000} Mbit/s");
-        if (wifi.Signal >= 0)
+            pripojeni.Pridej("Test proběhl přes", pres_wifi ? "Wi-Fi" : TypAdapteru(adapter), null,
+                $"Adaptér: {adapter.Description} · rychlost spojení: {adapter.Speed / 1_000_000} Mbit/s");
+        if (pres_wifi && wifi.Signal >= 0)
             pripojeni.Pridej("Síla Wi-Fi signálu", $"{wifi.Signal} %", wifi.Signal >= 70 ? Stav.Ok : wifi.Signal >= 40 ? Stav.Varovani : Stav.Chyba,
                 (wifi.Pasmo.Length > 0 ? $"Pásmo / standard: {wifi.Pasmo}\n" : "") +
                 "Pod 40 % je signál slabý – přibližte se k routeru, použijte pásmo 5 GHz, opakovač nebo kabel.");
+        else if (!pres_wifi && wifi.Signal >= 0)
+            pripojeni.Pridej("Wi-Fi", "připojena, ale nepoužívá se", Stav.Info,
+                "Internet jde přes kabel (Windows dává kabelu přednost). Wi-Fi na výsledek testu nemá vliv.");
+
+        if (adapter != null)
+        {
+            var ipp = adapter.GetIPProperties();
+            string Seznam(IEnumerable<System.Net.IPAddress> a) => string.Join(", ", a.Select(x => x.ToString()).Where(x => x.Length > 0));
+            var ip4 = ipp.UnicastAddresses.Where(u => u.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork).ToList();
+            pripojeni.Pridej("IP adresa", string.Join(", ", ip4.Select(u => $"{u.Address}/{u.PrefixLength}")));
+            pripojeni.Pridej("Brána (router)", Seznam(ipp.GatewayAddresses.Select(g => g.Address)));
+            pripojeni.Pridej("DNS servery", Seznam(ipp.DnsAddresses));
+            bool dhcp;
+            try { dhcp = ipp.GetIPv4Properties()?.IsDhcpEnabled ?? false; } catch { dhcp = false; }
+            pripojeni.Pridej("Přidělení adresy", dhcp ? "automaticky (DHCP)" : "ručně (statická IP)");
+            var mac = adapter.GetPhysicalAddress().GetAddressBytes();
+            if (mac.Length > 0) pripojeni.Pridej("MAC adresa", string.Join("-", mac.Select(b => b.ToString("X2"))));
+        }
+
+        var ipconfig = new List<string>();
+        try { await ProcessRunner.RunAsync("ipconfig.exe", "/all", new Sber(ipconfig), ct); }
+        catch (OperationCanceledException) { throw; }
+        catch { }
+        var vypis = string.Join("\n", ipconfig.Where(r => !r.StartsWith("> ") && !r.StartsWith("Návratový")).Select(r => r.TrimEnd()));
+        if (vypis.Trim().Length > 0)
+        {
+            var ipc = z.PridejSekci("Výpis ipconfig /all");
+            ipc.Sbalena = true;
+            ipc.Popis = "Kompletní nastavení všech síťových adaptérů – kliknutím rozbalíte.";
+            ipc.Pridej(vypis);
+        }
 
         var tipy = z.PridejSekci("Doporučení");
-        if (adapter?.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && down < 50)
+        if (pres_wifi && down < 50)
             tipy.Pridej("Zkuste test přes kabel", "", Stav.Info, "Wi-Fi bývá nejčastější brzdou. Pokud je přes kabel rychlost výrazně vyšší, problém je v Wi-Fi (router, rušení, vzdálenost).");
-        if (adapter != null && adapter.NetworkInterfaceType != NetworkInterfaceType.Wireless80211 && adapter.Speed == 100_000_000)
+        if (adapter != null && adapter.NetworkInterfaceType == NetworkInterfaceType.Ethernet && adapter.Speed == 100_000_000)
             tipy.Pridej("Síťová karta běží jen na 100 Mbit/s", "", Stav.Varovani, "Gigabitová karta často spadne na 100 Mbit/s kvůli vadnému nebo starému kabelu (Cat5). Vyměňte kabel za Cat5e/Cat6.");
         tipy.Pridej("Porovnejte s tarifem", "", Stav.Info,
             "Výsledek porovnejte s rychlostí ve smlouvě. Výsledek kolem 80–90 % tarifu je běžný; výrazně nižší výsledek přes kabel řešte s poskytovatelem.");
@@ -68,6 +97,42 @@ public static class RychlostSiteService
         z.Shrnuti = $"Stahování {down:0.0} Mbit/s · odesílání {up:0.0} Mbit/s · ping {(ping < 0 ? "–" : $"{ping:0} ms")}";
         return z;
     }
+
+    /// <summary>
+    /// Adaptér, kterým Windows skutečně posílá data do internetu: UDP „spojení“ na 1.1.1.1 (nic se neodešle)
+    /// ukáže zdrojovou IP podle směrovací tabulky – tedy podle výchozí trasy s nejnižší metrikou.
+    /// </summary>
+    public static NetworkInterface? AdapterInternetu()
+    {
+        var aktivni = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+            .ToList();
+        try
+        {
+            using var sok = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
+            sok.Connect("1.1.1.1", 53);
+            if (sok.LocalEndPoint is System.Net.IPEndPoint ep)
+            {
+                var nalez = aktivni.FirstOrDefault(n => n.GetIPProperties().UnicastAddresses.Any(u => u.Address.Equals(ep.Address)));
+                if (nalez != null) return nalez;
+            }
+        }
+        catch { }
+        // záloha: adaptér s bránou a nejnižší metrikou IPv4
+        return aktivni.Where(n => n.GetIPProperties().GatewayAddresses.Count > 0)
+            .OrderBy(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 1 : 0)
+            .FirstOrDefault();
+    }
+
+    private static string TypAdapteru(NetworkInterface n) => n.NetworkInterfaceType switch
+    {
+        NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.FastEthernetT => "kabel (Ethernet)",
+        NetworkInterfaceType.Ppp => "VPN / vytáčené připojení",
+        NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "mobilní data",
+        _ => n.Description.Contains("VPN", StringComparison.OrdinalIgnoreCase) || n.Description.Contains("TAP", StringComparison.OrdinalIgnoreCase)
+            ? "VPN" : "kabel / jiné"
+    };
 
     private static Stav Hodnot(double mbit, double dobre, double minimum) =>
         mbit >= dobre ? Stav.Ok : mbit >= minimum ? Stav.Varovani : Stav.Chyba;

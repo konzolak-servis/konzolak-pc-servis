@@ -252,10 +252,7 @@ public static class PrehledService
         karty.Add(oddily);
 
         // --- Síť ---
-        var nic = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback
-                        && n.GetIPProperties().GatewayAddresses.Count > 0)
-            .OrderByDescending(n => n.Speed).FirstOrDefault();
+        var nic = RychlostSiteService.AdapterInternetu();
         if (nic != null)
         {
             var ip = nic.GetIPProperties().UnicastAddresses.FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString();

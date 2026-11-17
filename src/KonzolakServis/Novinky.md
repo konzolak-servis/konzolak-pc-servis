@@ -1,3 +1,8 @@
+## 0.10
+- Test rychlosti internetu: správně pozná, přes který adaptér test skutečně běží (podle směrování Windows). Notebook připojený kabelem už neukazuje Wi-Fi; síla Wi-Fi signálu se zobrazí jen při testu přes Wi-Fi.
+- Sekce Připojení: IP adresa, brána, DNS servery, DHCP/statická IP, MAC adresa a kompletní výpis ipconfig /all (rozbalovací).
+- Úvodní stránka: karta Síť ukazuje skutečně používané připojení.
+
 ## 0.9
 - Disky → Kvalita a zdraví disků: skóre 0–100 pro každý disk (výborný / dobrý / opotřebený / špatný / kritický) s vysvětlením, proč skóre kleslo.
 - SMART srozumitelně: přemapované, nestabilní a neopravitelné sektory, chyby kabelu, teplota, opotřebení SSD, doba provozu, předpověď selhání. Kompletní tabulka atributů SMART s českými názvy a vysvětlením.
