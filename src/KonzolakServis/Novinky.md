@@ -1,3 +1,9 @@
+## 0.11
+- Nový Benchmark PC (Diagnostika): vlastní test procesoru na jednom jádře i všech jádrech + test Windows WinSAT (procesor, paměť RAM, grafika, disk) se skóre 1,0–9,9 a hodnocením slabé / průměrné / dobré / výborné.
+- Porovnání s obvyklými výsledky podle hardwaru (třída procesoru, typ paměti DDR3/4/5, typ disku HDD/SSD/NVMe, integrovaná nebo samostatná grafika) s možnými příčinami, když je výsledek pod očekáváním. Tlačítko „Porovnat na internetu“ pro konkrétní model.
+- Historie testů: každý test se ukládá do Dokumenty\Konzolák Servis\Historie (jeden soubor na test), v aplikaci porovnání s minulým testem a tlačítko pro otevření složky.
+- Doporučení podle nejslabší části počítače.
+
 ## 0.10
 - Test rychlosti internetu: správně pozná, přes který adaptér test skutečně běží (podle směrování Windows). Notebook připojený kabelem už neukazuje Wi-Fi; síla Wi-Fi signálu se zobrazí jen při testu přes Wi-Fi.
 - Sekce Připojení: IP adresa, brána, DNS servery, DHCP/statická IP, MAC adresa a kompletní výpis ipconfig /all (rozbalovací).

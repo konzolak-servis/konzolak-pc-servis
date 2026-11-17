@@ -61,6 +61,11 @@ public static class ServisniKatalog
             Popis = "Zařízení s vykřičníkem ve Správci zařízení – co je špatně a jak to opravit.",
             Spustit = ZarizeniService.ZpravaAsync },
 
+        new() {
+            Nazev = "Benchmark PC", Kategorie = Kategorie.Diagnostika,
+            Popis = "Výkon procesoru (1 jádro / všechna), paměti, grafiky a disku. Skóre, porovnání s obvyklými výsledky a historie testů.",
+            Spustit = BenchmarkPcService.SpustAsync },
+
         // ---------- DISKY ----------
         new() {
             Nazev = "Kvalita a zdraví disků", Kategorie = Kategorie.Disky,
