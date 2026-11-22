@@ -15,7 +15,7 @@ public static class HesloOkno
 
         var w = new Window
         {
-            Title = "Konzolák Servis", Width = 420, SizeToContent = SizeToContent.Height,
+            Title = "Konzolak service app", Width = 420, SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Background = B("Pozadi"), Foreground = B("Text"), ShowInTaskbar = true
         };
@@ -23,7 +23,7 @@ public static class HesloOkno
         var panel = new StackPanel { Margin = new Thickness(26) };
         panel.Children.Add(new TextBlock
         {
-            Text = "Konzolák Servis", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = B("Akcent")
+            Text = "Konzolak service app", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = B("Akcent")
         });
         panel.Children.Add(new TextBlock
         {

@@ -1,3 +1,7 @@
+## 0.16
+- Oprava: akce využívající PowerShell (např. vypnutí ochran, čištění, opravy) fungují i když je aplikace spuštěná ze složky na OneDrive (Plocha, Dokumenty). Dřív hlásily „Přístup byl odepřen".
+- Sjednocen název v oknech a hláškách na „Konzolak service app".
+
 ## 0.15
 - Oprava: po zadání správného hesla se aplikace spustí (hlavní okno se nyní správně otevře).
 

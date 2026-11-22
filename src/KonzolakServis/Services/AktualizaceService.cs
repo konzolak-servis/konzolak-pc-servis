@@ -124,7 +124,8 @@ public static class AktualizaceService
             $"start \"\" \"{novy}\"\r\n" +
             "del \"%~f0\"\r\n");
         Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{skript}\"")
-        { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
+        { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden,
+          WorkingDirectory = Environment.SystemDirectory });
     }
 
     /// <summary>Seznam změn zabalený v aplikaci (Novinky.md).</summary>

@@ -20,7 +20,7 @@ public static class VyberDisku
         Brush B(string k) => Application.Current.TryFindResource(k) as Brush ?? Brushes.Gray;
         if (disky.Count == 0)
         {
-            MessageBox.Show("Nenalezen žádný disk.", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Nenalezen žádný disk.", "Konzolak service app", MessageBoxButton.OK, MessageBoxImage.Warning);
             return null;
         }
 

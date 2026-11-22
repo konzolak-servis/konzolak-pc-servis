@@ -22,6 +22,9 @@ public static class ProcessRunner
             RedirectStandardError = true,
             StandardOutputEncoding = encoding ?? Oem,
             StandardErrorEncoding = encoding ?? Oem,
+            // Bezpečný pracovní adresář. Když aplikace běží ze složky na OneDrive (Plocha, Dokumenty…),
+            // selhalo by spuštění powershell.exe s „Přístup byl odepřen" kvůli zděděnému pracovnímu adresáři.
+            WorkingDirectory = Environment.SystemDirectory,
         };
         using var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         p.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) log.Report(Clean(e.Data)); };
@@ -38,13 +41,17 @@ public static class ProcessRunner
     // sfc a DISM vypisují průběh s \r a nulovými znaky – uklidíme
     private static string Clean(string s) => s.Replace("\0", "").Replace("\r", "").TrimEnd();
 
+    /// <summary>Plná cesta k powershell.exe (System32\WindowsPowerShell\v1.0) – spolehlivější než spoléhat na PATH.</summary>
+    private static readonly string PowerShellCesta =
+        System.IO.Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+
     public static Task<int> PowerShellAsync(string script, IProgress<string> log, CancellationToken ct)
     {
         // -EncodedCommand = žádné problémy s uvozovkami a diakritikou
         var full = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $ProgressPreference='SilentlyContinue'; " + script;
         var b64 = Convert.ToBase64String(Encoding.Unicode.GetBytes(full));
         log.Report("> PowerShell: " + script);
-        return RunAsync("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + b64,
+        return RunAsync(PowerShellCesta, "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + b64,
             new Filtr(log), ct, Encoding.UTF8);
     }
 
