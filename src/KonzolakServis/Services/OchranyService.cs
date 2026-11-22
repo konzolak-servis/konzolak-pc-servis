@@ -139,7 +139,7 @@ public static class OchranyService
 
         return "Ochrany vypnuty: " + string.Join("; ", vysledky) +
                ". Spolu s ochranou v reálném čase Windows dočasně vypne i cloudovou ochranu a odesílání vzorků – " +
-               "tlačítko „Znovu zapnout všechny ochrany" je všechny vrátí zpět.";
+               "tlačítko „Znovu zapnout všechny ochrany“ je všechny vrátí zpět.";
     }
 
     private static async Task<string> ZapnoutVse(IProgress<string> l, CancellationToken c)
