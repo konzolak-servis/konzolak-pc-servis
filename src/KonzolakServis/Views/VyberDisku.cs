@@ -28,7 +28,7 @@ public static class VyberDisku
         {
             Title = nadpis, Width = 560, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = B("Pozadi"), Foreground = B("Text"),
-            Owner = Application.Current.MainWindow, ShowInTaskbar = false
+            Owner = Application.Current.MainWindow, ShowInTaskbar = false, Icon = Ikona.Aplikace
         };
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(new TextBlock { Text = nadpis, FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = B("Akcent") });
