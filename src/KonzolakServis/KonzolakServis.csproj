@@ -12,11 +12,7 @@
     <Product>Konzolak service app</Product>
     <Company>Konzolák</Company>
     <!-- Verze = HlavniVerze.CisloBuildu; číslo buildu doplňuje GitHub Actions (každý build +1) -->
-<<<<<<< HEAD
     <HlavniVerze>0.18</HlavniVerze>
-=======
-    <HlavniVerze>0.17</HlavniVerze>
->>>>>>> 2ca8d1e9a4600f90cdf30fcfd48e2d05bd5b5dca
     <CisloBuildu Condition="'$(CisloBuildu)' == ''">0</CisloBuildu>
     <Version>$(HlavniVerze).$(CisloBuildu)</Version>
     <!-- Odkud se stahují aktualizace (veřejný GitHub repozitář s vydáními) -->
