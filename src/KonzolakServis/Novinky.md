@@ -1,3 +1,8 @@
+## 0.13
+- Nástroje → Dočasně vypnout ochrany (instalace programů): jedním tlačítkem dočasně vypne ochranu Defenderu v reálném čase, firewall ve všech profilech i SmartScreen pro aplikace, když brání instalaci důvěryhodného programu. Dalším tlačítkem se stejně snadno vše zase zapne.
+- Před vypnutím srozumitelné české varování, že jde o dočasné bezpečnostní riziko, a doporučení ochrany po instalaci hned obnovit.
+- Přehled aktuálního stavu všech ochran. Pokud je zapnutá Ochrana proti neoprávněným změnám (Tamper Protection), aplikace to pozná a poradí, jak ji ručně vypnout. Jiné antiviry než Defender aplikace nevypíná, ale upozorní na ně a poradí je pozastavit ručně.
+
 ## 0.12
 - Benchmark PC: notebooky se dvěma grafikami (např. Intel Arc + NVIDIA RTX) – každá grafika se testuje zvlášť s vynucenou volbou výkonné / úsporné karty (nastavení Windows se po testu vrátí). U výsledku je vždy uvedeno, která karta byla testována, propustnost její video paměti a porovnání s obvyklými výsledky pro každou kartu.
 - Odstraněno zavádějící „herní“ skóre WinSAT (novější Windows ho vždy hlásí jako 9,9).
