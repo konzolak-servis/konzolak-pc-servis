@@ -1,3 +1,7 @@
+## 0.18
+- Oprava: „Znovu zapnout všechny ochrany" teď skutečně zapne „blokování potenciálně nežádoucích aplikací" v Ochraně na základě reputace. Dřív se nastavovala jiná (antivirová) volba PUA, takže varování ve Windows nezmizelo. Nově se přepíná správný přepínač SmartScreen (SmartScreenPuaEnabled).
+- V přehledu ochran je nově vidět i verze aplikace (pro kontrolu, že máte aktuální build).
+
 ## 0.17
 - Vypnutí ochran: „Znovu zapnout všechny ochrany" nyní obnoví i Ochranu na základě reputace (blokování potenciálně nežádoucích aplikací – PUA), ne jen Defender, firewall a SmartScreen. Vypnutí a zapnutí je symetrické. V přehledu přibyl stav PUA.
 
