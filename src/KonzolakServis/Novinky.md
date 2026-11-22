@@ -1,3 +1,8 @@
+## 0.14
+- Spuštění aplikace je nově chráněné heslem – bez správného hesla se nástroj nespustí (ochrana proti tomu, aby ho spustil sám zákazník). V Nástrojích → „Změnit heslo pro spuštění" si můžeš nastavit vlastní heslo, které se uloží jen do daného počítače.
+- Aplikace se přejmenovala na „Konzolak service app" (název okna i souboru .exe).
+- Po spuštění nové verze se automaticky ukáže info stránka s přehledem změn. Kontrola aktualizací probíhá po startu na pozadí.
+
 ## 0.13
 - Nástroje → Dočasně vypnout ochrany (instalace programů): jedním tlačítkem dočasně vypne ochranu Defenderu v reálném čase, firewall ve všech profilech i SmartScreen pro aplikace, když brání instalaci důvěryhodného programu. Dalším tlačítkem se stejně snadno vše zase zapne.
 - Před vypnutím srozumitelné české varování, že jde o dočasné bezpečnostní riziko, a doporučení ochrany po instalaci hned obnovit.
