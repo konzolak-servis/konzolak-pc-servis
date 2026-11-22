@@ -17,7 +17,7 @@ public static class HesloOkno
         {
             Title = "Konzolak service app", Width = 420, SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Background = B("Pozadi"), Foreground = B("Text"), ShowInTaskbar = true
+            Background = B("Pozadi"), Foreground = B("Text"), ShowInTaskbar = true, Icon = Ikona.Aplikace
         };
 
         var panel = new StackPanel { Margin = new Thickness(26) };
@@ -80,7 +80,8 @@ public static class HesloOkno
         {
             Title = "Změnit heslo pro spuštění", Width = 440, SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = B("Pozadi"), Foreground = B("Text"), Owner = Application.Current.MainWindow, ShowInTaskbar = false
+            Background = B("Pozadi"), Foreground = B("Text"), Owner = Application.Current.MainWindow, ShowInTaskbar = false,
+            Icon = Ikona.Aplikace
         };
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(new TextBlock { Text = "Změnit heslo pro spuštění", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = B("Akcent") });

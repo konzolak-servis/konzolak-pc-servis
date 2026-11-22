@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Title = $"Konzolak service app v{AktualizaceService.VerzeText}";
+        if (Views.Ikona.Aplikace is { } ikona) Icon = ikona;
         VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText}";
         _log.Radek += l => Dispatcher.Invoke(() => { Konzole.AppendText(l + Environment.NewLine); Konzole.ScrollToEnd(); });
         DiskService.ZivaMapa += (bunky, text) => Dispatcher.InvokeAsync(() => ZivaMapa(bunky, text));

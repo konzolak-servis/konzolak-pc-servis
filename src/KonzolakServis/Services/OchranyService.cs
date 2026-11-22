@@ -35,6 +35,11 @@ public static class OchranyService
 
     private const string ExplorerKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer";
 
+    // Toggle „blokování potenciálně nežádoucích aplikací" v Zabezpečení Windows → Ochrana na základě reputace.
+    // Řídí ho SmartScreen přes tento klíč (1 = zapnuto, 0 = vypnuto), NE Set-MpPreference -PUAProtection.
+    private const string DefenderKlic = @"SOFTWARE\Microsoft\Windows Defender";
+    private const string PuaHodnota = "SmartScreenPuaEnabled";
+
     /// <summary>Je ochrana Defenderu v reálném čase zapnutá? (null = Defender na tomto PC není)</summary>
     private static bool? DefenderZapnuty()
     {
@@ -58,12 +63,11 @@ public static class OchranyService
         return !string.Equals(v, "Off", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Blokování potenciálně nežádoucích aplikací (PUA) – součást Ochrany na základě reputace. (null = nelze zjistit)</summary>
+    /// <summary>Blokování potenciálně nežádoucích aplikací (PUA) v Ochraně na základě reputace. (null = hodnota není nastavená)</summary>
     private static bool? PuaZapnuty()
     {
-        var mp = Wmi(@"root\Microsoft\Windows\Defender", "SELECT PUAProtection FROM MSFT_MpPreference");
-        if (mp?["PUAProtection"] is null) return null;
-        try { return Convert.ToInt32(mp["PUAProtection"]) == 1; } catch { return null; }
+        var v = ZalohaService.CtiReg("HKLM", DefenderKlic, PuaHodnota);
+        return v == null ? (bool?)null : v != "0";
     }
 
     // ---------- Hromadné akce ----------
@@ -89,6 +93,12 @@ public static class OchranyService
             "' -Name SmartScreenEnabled -Value 'Off' -PropertyType String -Force | Out-Null", l, c);
         vysledky.Add("SmartScreen pro aplikace vypnut");
 
+        // Toggle „blokování nežádoucích aplikací" v Ochraně na základě reputace (SmartScreen, ne MpPreference).
+        await ProcessRunner.PowerShellAsync(
+            "New-ItemProperty -Path 'HKLM:\\" + DefenderKlic +
+            "' -Name " + PuaHodnota + " -Value 0 -PropertyType DWord -Force | Out-Null", l, c);
+        vysledky.Add("ochrana na základě reputace (blokování nežádoucích aplikací) vypnuta");
+
         var jine = CizíAntiviry();
         if (jine.Count > 0)
             vysledky.Add($"POZOR: jiný antivirus ({string.Join(", ", jine)}) vypněte ručně v jeho okně (ikona u hodin → pozastavit ochranu)");
@@ -107,8 +117,12 @@ public static class OchranyService
         await ProcessRunner.PowerShellAsync(
             "New-ItemProperty -Path 'HKLM:\\" + ExplorerKlic +
             "' -Name SmartScreenEnabled -Value 'Warn' -PropertyType String -Force | Out-Null", l, c);
+        // Toggle „blokování nežádoucích aplikací" v Ochraně na základě reputace zpět na zapnuto.
+        await ProcessRunner.PowerShellAsync(
+            "New-ItemProperty -Path 'HKLM:\\" + DefenderKlic +
+            "' -Name " + PuaHodnota + " -Value 1 -PropertyType DWord -Force | Out-Null", l, c);
         return "Ochrany zase zapnuty: Defender v reálném čase, firewall ve všech profilech, SmartScreen " +
-               "i ochrana na základě reputace (blokování nežádoucích aplikací – PUA).";
+               "i ochrana na základě reputace (blokování nežádoucích aplikací).";
     }
 
     private static List<string> CizíAntiviry() =>
@@ -134,6 +148,7 @@ public static class OchranyService
 
         // Stav jednotlivých ochran
         var s = z.PridejSekci("Aktuální stav ochran");
+        s.Pridej("Verze aplikace", AktualizaceService.VerzeText, Stav.Info);
 
         var def = DefenderZapnuty();
         if (def == null)
