@@ -1,3 +1,7 @@
+## 0.19
+- Velká oprava vypínání ochran: tlačítko „Znovu zapnout všechny ochrany" teď vrátí úplně všechno zpět. Vypnutí ochrany v reálném čase ve Windows totiž kaskádově vypne i cloudovou ochranu, automatické odesílání vzorků a blokování při prvním výskytu – a ty se samy znovu nezapnuly. Zapínání je nově napsané tak, že nastaví celý ochranný stav najednou: ochrana v reálném čase, cloudová ochrana, odesílání vzorků, blokování při prvním výskytu, PUA/reputace, firewall, SmartScreen pro aplikace i pro aplikace z Microsoft Store.
+- V přehledu ochran přibyl stav cloudové ochrany a automatického odesílání vzorků, takže je po zapnutí vidět, že je opravdu všechno zelené.
+
 ## 0.18
 - Oprava: „Znovu zapnout všechny ochrany" teď skutečně zapne „blokování potenciálně nežádoucích aplikací" v Ochraně na základě reputace. Dřív se nastavovala jiná (antivirová) volba PUA, takže varování ve Windows nezmizelo. Nově se přepíná správný přepínač SmartScreen (SmartScreenPuaEnabled).
 - V přehledu ochran je nově vidět i verze aplikace (pro kontrolu, že máte aktuální build).

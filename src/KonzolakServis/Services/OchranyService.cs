@@ -7,6 +7,11 @@ namespace KonzolakServis.Services;
 /// Dočasné vypnutí ochranných programů Windows kvůli instalaci softwaru, který ochrany blokují.
 /// Jedním tlačítkem vypne ochranu Defenderu v reálném čase, firewall i SmartScreen a stejně jednoduše vše zase zapne.
 /// Vyžaduje práva správce (řeší app.manifest).
+///
+/// DŮLEŽITÉ: vypnutí ochrany v reálném čase ve Windows KASKÁDOVĚ vypne i cloudovou ochranu (MAPSReporting),
+/// automatické odesílání vzorků (SubmitSamplesConsent) a „blokování při prvním výskytu" (BlockAtFirstSeen).
+/// Opětovné zapnutí realtime je samo NEvrátí – proto je „Znovu zapnout všechny ochrany" napsané deklarativně:
+/// nastaví VŠECHNA nastavení na jejich ochranný (výchozí) stav, ne jen to, co „Vypnout" zrovna změnilo.
 /// </summary>
 public static class OchranyService
 {
@@ -33,24 +38,52 @@ public static class OchranyService
         return list;
     }
 
-    private const string ExplorerKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer";
+    private const string DefenderScope = @"root\Microsoft\Windows\Defender";
 
-    // Toggle „blokování potenciálně nežádoucích aplikací" v Zabezpečení Windows → Ochrana na základě reputace.
-    // Řídí ho SmartScreen přes tento klíč (1 = zapnuto, 0 = vypnuto), NE Set-MpPreference -PUAProtection.
+    // --- SmartScreen / reputační registry (karta „Řízení aplikací a prohlížečů") ---
+    private const string ExplorerKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer"; // SmartScreen pro aplikace
+    // Toggle „blokování potenciálně nežádoucích aplikací" v Ochraně na základě reputace – řídí SmartScreen, NE Set-MpPreference.
     private const string DefenderKlic = @"SOFTWARE\Microsoft\Windows Defender";
     private const string PuaHodnota = "SmartScreenPuaEnabled";
+    // SmartScreen pro aplikace z Microsoft Store (per-uživatel).
+    private const string StoreKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\AppHost";
+    private const string StoreHodnota = "EnableWebContentEvaluation";
 
-    /// <summary>Je ochrana Defenderu v reálném čase zapnutá? (null = Defender na tomto PC není)</summary>
+    // ---------- čtečky stavu ----------
+
     private static bool? DefenderZapnuty()
     {
-        var mp = Wmi(@"root\Microsoft\Windows\Defender", "SELECT RealTimeProtectionEnabled FROM MSFT_MpComputerStatus");
+        var mp = Wmi(DefenderScope, "SELECT RealTimeProtectionEnabled FROM MSFT_MpComputerStatus");
         return mp?["RealTimeProtectionEnabled"] is bool b ? b : (bool?)null;
     }
 
     private static bool TamperOchrana()
     {
-        var mp = Wmi(@"root\Microsoft\Windows\Defender", "SELECT IsTamperProtected FROM MSFT_MpComputerStatus");
+        var mp = Wmi(DefenderScope, "SELECT IsTamperProtected FROM MSFT_MpComputerStatus");
         return mp?["IsTamperProtected"] is true;
+    }
+
+    /// <summary>Hodnota z MSFT_MpPreference (null = Defender/vlastnost není). Vrací se jako long kvůli byte/uint.</summary>
+    private static long? MpPref(string vlastnost)
+    {
+        var p = Wmi(DefenderScope, $"SELECT {vlastnost} FROM MSFT_MpPreference");
+        var v = p?[vlastnost];
+        if (v == null) return null;
+        try { return Convert.ToInt64(v); } catch { return null; }
+    }
+
+    /// <summary>Cloudová ochrana (MAPSReporting): 0 = vypnuto, >0 zapnuto (1 Basic / 2 Advanced).</summary>
+    private static bool? CloudZapnuta()
+    {
+        var v = MpPref("MAPSReporting");
+        return v == null ? (bool?)null : v != 0;
+    }
+
+    /// <summary>Automatické odesílání vzorků (SubmitSamplesConsent): zapnuto = 1 (bezpečné) nebo 3 (vše).</summary>
+    private static bool? VzorkyZapnute()
+    {
+        var v = MpPref("SubmitSamplesConsent");
+        return v == null ? (bool?)null : v is 1 or 3;
     }
 
     private static bool FirewallProfilZapnuty(string profil) =>
@@ -76,6 +109,7 @@ public static class OchranyService
     {
         var vysledky = new List<string>();
 
+        // Ochrana v reálném čase + navázané skenování. (Tím Windows kaskádově vypne i cloud, vzorky a block-at-first-seen.)
         await ProcessRunner.PowerShellAsync(
             "Set-MpPreference -DisableRealtimeMonitoring $true -DisableIOAVProtection $true " +
             "-DisableBehaviorMonitoring $true -DisableScriptScanning $true -PUAProtection Disabled -ErrorAction SilentlyContinue",
@@ -104,25 +138,43 @@ public static class OchranyService
             vysledky.Add($"POZOR: jiný antivirus ({string.Join(", ", jine)}) vypněte ručně v jeho okně (ikona u hodin → pozastavit ochranu)");
 
         return "Ochrany vypnuty: " + string.Join("; ", vysledky) +
-               ". Po instalaci je prosím znovu zapněte tlačítkem výše.";
+               ". Spolu s ochranou v reálném čase Windows dočasně vypne i cloudovou ochranu a odesílání vzorků – " +
+               "tlačítko „Znovu zapnout všechny ochrany" je všechny vrátí zpět.";
     }
 
     private static async Task<string> ZapnoutVse(IProgress<string> l, CancellationToken c)
     {
+        // Deklarativně obnovíme CELÝ ochranný stav – ne jen to, co „Vypnout" změnilo.
+        // 1) Nejdřív zpět ochrana v reálném čase (musí běžet, aby šlo zapnout cloud/vzorky).
         await ProcessRunner.PowerShellAsync(
             "Set-MpPreference -DisableRealtimeMonitoring $false -DisableIOAVProtection $false " +
             "-DisableBehaviorMonitoring $false -DisableScriptScanning $false -PUAProtection Enabled -ErrorAction SilentlyContinue",
             l, c);
+        // 2) Cloudová ochrana (Advanced), automatické odesílání vzorků (bezpečné) a blokování při prvním výskytu.
+        await ProcessRunner.PowerShellAsync(
+            "Set-MpPreference -MAPSReporting Advanced -SubmitSamplesConsent SendSafeSamples " +
+            "-DisableBlockAtFirstSeen $false -ErrorAction SilentlyContinue",
+            l, c);
+
+        // 3) Firewall ve všech profilech.
         await ProcessRunner.RunAsync("netsh.exe", "advfirewall set allprofiles state on", l, c);
+
+        // 4) SmartScreen pro aplikace.
         await ProcessRunner.PowerShellAsync(
             "New-ItemProperty -Path 'HKLM:\\" + ExplorerKlic +
             "' -Name SmartScreenEnabled -Value 'Warn' -PropertyType String -Force | Out-Null", l, c);
-        // Toggle „blokování nežádoucích aplikací" v Ochraně na základě reputace zpět na zapnuto.
+        // 5) Reputační blokování nežádoucích aplikací (PUA).
         await ProcessRunner.PowerShellAsync(
             "New-ItemProperty -Path 'HKLM:\\" + DefenderKlic +
             "' -Name " + PuaHodnota + " -Value 1 -PropertyType DWord -Force | Out-Null", l, c);
-        return "Ochrany zase zapnuty: Defender v reálném čase, firewall ve všech profilech, SmartScreen " +
-               "i ochrana na základě reputace (blokování nežádoucích aplikací).";
+        // 6) SmartScreen pro aplikace z Microsoft Store (per-uživatel).
+        await ProcessRunner.PowerShellAsync(
+            "New-ItemProperty -Path 'HKCU:\\" + StoreKlic +
+            "' -Name " + StoreHodnota + " -Value 1 -PropertyType DWord -Force | Out-Null", l, c);
+
+        return "Ochrany zase zapnuty: ochrana v reálném čase, cloudová ochrana, automatické odesílání vzorků, " +
+               "blokování při prvním výskytu, blokování nežádoucích aplikací (PUA), firewall ve všech profilech, " +
+               "SmartScreen pro aplikace i pro aplikace z Microsoft Store.";
     }
 
     private static List<string> CizíAntiviry() =>
@@ -140,7 +192,7 @@ public static class OchranyService
 
         z.HromadneAkce.Add(new AkceRadku("Vypnout všechny ochrany", VypnoutVse)
         {
-            Potvrzeni = "Tím dočasně VYPNETE ochranu počítače (Defender, firewall i SmartScreen).\n\n" +
+            Potvrzeni = "Tím dočasně VYPNETE ochranu počítače (Defender v reálném čase, cloudová ochrana, firewall i SmartScreen).\n\n" +
                         "Používejte jen na krátkou dobu kvůli instalaci důvěryhodného programu a hned poté ochrany zase zapněte. " +
                         "Mezitím stahujte a instalujte jen soubory, kterým věříte.\n\nOpravdu vypnout ochrany?"
         });
@@ -161,6 +213,15 @@ public static class OchranyService
                 s.Pridej("Ochrana proti neoprávněným změnám", "zapnutá", Stav.Info,
                     "Dokud je zapnutá (Tamper Protection), nejde Defender vypnout z aplikace. " +
                     "Vypněte ji ručně: Zabezpečení Windows → Ochrana před viry a hrozbami → Spravovat nastavení.");
+
+            var cloud = CloudZapnuta();
+            if (cloud != null)
+                s.Pridej("Cloudová ochrana", cloud == true ? "zapnutá" : "VYPNUTÁ",
+                    cloud == true ? Stav.Ok : Stav.Varovani, "MAPSReporting – ochrana z cloudu Microsoftu.");
+            var vzorky = VzorkyZapnute();
+            if (vzorky != null)
+                s.Pridej("Automatické odesílání vzorků", vzorky == true ? "zapnuté" : "VYPNUTÉ",
+                    vzorky == true ? Stav.Ok : Stav.Varovani, "SubmitSamplesConsent – odesílání podezřelých souborů Microsoftu.");
         }
 
         var profily = new[] { ("DomainProfile", "Doménová síť"), ("StandardProfile", "Soukromá síť"), ("PublicProfile", "Veřejná síť") };
@@ -181,7 +242,8 @@ public static class OchranyService
             s.Pridej(n, "jiný antivirus", Stav.Info,
                 "Jiný antivirus než Defender aplikace vypnout neumí. Pozastavte jeho ochranu ručně – ikonou u hodin (pravé tlačítko → pozastavit ochranu).");
 
-        var vypnuto = def == false || fwZap == 0 || !SmartScreenZapnuty() || pua == false;
+        var vypnuto = def == false || fwZap == 0 || !SmartScreenZapnuty() || pua == false
+                      || CloudZapnuta() == false || VzorkyZapnute() == false;
         z.Stav = vypnuto ? Stav.Varovani : Stav.Ok;
         z.Shrnuti = vypnuto
             ? "Některé ochrany jsou VYPNUTÉ. Po instalaci je znovu zapněte tlačítkem „Znovu zapnout všechny ochrany“."
