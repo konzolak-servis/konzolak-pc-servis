@@ -67,6 +67,11 @@ public static class ServisniKatalog
             Spustit = async (log, ct) => Vysl(await OchranyService.ZpravaAsync(log, ct)) },
 
         new() {
+            Nazev = "Změnit heslo pro spuštění", Kategorie = Kategorie.Nastroje,
+            Popis = "Nastaví vlastní heslo, kterým se aplikace spouští. Uloží se jen do tohoto počítače. Chrání nástroj před spuštěním zákazníkem.",
+            Spustit = (log, _) => Task.FromResult(Vysl(Views.HesloOkno.Zmenit())) },
+
+        new() {
             Nazev = "Benchmark PC", Kategorie = Kategorie.Diagnostika,
             Popis = "Výkon procesoru (1 jádro / všechna), paměti, grafiky a disku. Skóre, porovnání s obvyklými výsledky a historie testů.",
             Spustit = BenchmarkPcService.SpustAsync },

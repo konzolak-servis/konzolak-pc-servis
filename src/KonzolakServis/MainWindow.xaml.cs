@@ -34,7 +34,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = $"Konzolák Servis v{AktualizaceService.VerzeText}";
+        Title = $"Konzolak service app v{AktualizaceService.VerzeText}";
         VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText}";
         _log.Radek += l => Dispatcher.Invoke(() => { Konzole.AppendText(l + Environment.NewLine); Konzole.ScrollToEnd(); });
         DiskService.ZivaMapa += (bunky, text) => Dispatcher.InvokeAsync(() => ZivaMapa(bunky, text));
@@ -567,7 +567,29 @@ public partial class MainWindow : Window
 
     private NovaVerze? _nova;
 
-    private async void Window_Loaded(object s, RoutedEventArgs e) => await ZkontrolujAsync(tiše: true);
+    private async void Window_Loaded(object s, RoutedEventArgs e)
+    {
+        ZobrazNovinkyPoAktualizaci();           // po spuštění ukáž, co je v této verzi nového
+        await ZkontrolujAsync(tiše: true);       // a na pozadí zkontroluj nové aktualizace
+    }
+
+    private const string KlicVerze = @"SOFTWARE\Konzolak Servis";
+
+    /// <summary>Při prvním spuštění nové verze automaticky ukáže info stránku se seznamem změn.</summary>
+    private void ZobrazNovinkyPoAktualizaci()
+    {
+        string? posledni = null;
+        try { using var k = Registry.CurrentUser.OpenSubKey(KlicVerze); posledni = k?.GetValue("PosledniVerze") as string; }
+        catch { }
+
+        if (posledni == AktualizaceService.VerzeText) return;   // tuto verzi už uživatel viděl
+
+        try { using var k = Registry.CurrentUser.CreateSubKey(KlicVerze, true); k.SetValue("PosledniVerze", AktualizaceService.VerzeText); }
+        catch { }
+
+        if (posledni == null) return;   // úplně první spuštění – nevyskakuj hned s novinkami
+        Novinky_Click(this, new RoutedEventArgs());
+    }
 
     private async void Zkontrolovat_Click(object s, RoutedEventArgs e) => await ZkontrolujAsync(tiše: false);
 

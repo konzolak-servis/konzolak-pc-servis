@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Windows;
+using KonzolakServis.Views;
 
 namespace KonzolakServis;
 
@@ -14,5 +15,13 @@ public partial class App : Application
         CultureInfo.DefaultThreadCurrentCulture = cz;
         CultureInfo.DefaultThreadCurrentUICulture = cz;
         base.OnStartup(e);
+
+        // Zámek na heslo – bez správného hesla se aplikace nespustí (ochrana proti spuštění zákazníkem).
+        if (!HesloOkno.Overit())
+        {
+            Shutdown();
+            return;
+        }
+        new MainWindow().Show();
     }
 }

@@ -33,7 +33,7 @@ jobs:
 
       - name: Pojmenovat podle verze
         shell: pwsh
-        run: Rename-Item publish/KonzolakServis.exe "KonzolakServis_v${{ steps.verze.outputs.verze }}.exe"
+        run: Rename-Item publish/KonzolakServis.exe "KonzolakServiceApp_v${{ steps.verze.outputs.verze }}.exe"
 
       # Podpis přes Azure Trusted Signing (Microsoft). Potřebné secrets:
       # AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
@@ -56,8 +56,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KonzolakServis_v${{ steps.verze.outputs.verze }}
-          path: publish/KonzolakServis_v${{ steps.verze.outputs.verze }}.exe
+          name: KonzolakServiceApp_v${{ steps.verze.outputs.verze }}
+          path: publish/KonzolakServiceApp_v${{ steps.verze.outputs.verze }}.exe
 
       # Každý build z větve main = nové vydání. Z něj si aplikace stahuje aktualizace.
       - name: Vydat verzi
@@ -72,4 +72,4 @@ jobs:
           $sekce = ($text -split '(?m)^## ')[1]
           $popis = ($sekce -split "`n", 2)[1].Trim()
           Set-Content poznamky.md $popis -Encoding UTF8
-          gh release create "v$verze" "publish/KonzolakServis_v$verze.exe" --title "Konzolák Servis $verze" --notes-file poznamky.md
+          gh release create "v$verze" "publish/KonzolakServiceApp_v$verze.exe" --title "Konzolak service app $verze" --notes-file poznamky.md
