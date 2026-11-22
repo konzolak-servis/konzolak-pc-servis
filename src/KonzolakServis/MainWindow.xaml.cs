@@ -49,7 +49,7 @@ public partial class MainWindow : Window
             Menu.Children.Add(rb);
         }
         ((RadioButton)Menu.Children[0]).IsChecked = true;
-        _log.Zapis("Konzolák Servis připraven.");
+        _log.Zapis("Konzolak service app připraven.");
     }
 
     private void Zobraz(Kategorie kat, string nazev)
@@ -75,11 +75,11 @@ public partial class MainWindow : Window
 
     private async Task SpustAsync(ServisniAkce a)
     {
-        if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolák Servis"); return; }
+        if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolak service app"); return; }
         if (a.MeniSystem)
         {
             var text = $"Akce „{a.Nazev}“ provede změny v systému.\n{a.Varovani}\n\nPokračovat?";
-            if (MessageBox.Show(text, "Konzolák Servis", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(text, "Konzolak service app", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
         }
 
@@ -432,9 +432,9 @@ public partial class MainWindow : Window
 
     private async Task ProvedNapravuAsync(AkceRadku a, Zprava z, Button tlacitko)
     {
-        if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolák Servis"); return; }
+        if (_cts != null) { MessageBox.Show("Počkej, až doběhne předchozí akce.", "Konzolak service app"); return; }
         if (a.Potvrzeni != null &&
-            MessageBox.Show(a.Potvrzeni, "Konzolák Servis", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            MessageBox.Show(a.Potvrzeni, "Konzolak service app", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
         _cts = new CancellationTokenSource();
@@ -507,7 +507,7 @@ public partial class MainWindow : Window
         VysledekPanel.Children.Insert(0, banner);
         VysledekScroll.ScrollToTop();
         if (chyba)
-            MessageBox.Show($"{akce}\n\n{text}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"{akce}\n\n{text}", "Konzolak service app", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // ---------- Tlačítka ----------
@@ -558,7 +558,7 @@ public partial class MainWindow : Window
     {
         _log.Zapis($"Uloženo: {cesta}");
         StavText.Text = $"Uloženo: {System.IO.Path.GetFileName(cesta)}";
-        if (MessageBox.Show($"Soubor byl uložen:\n{cesta}\n\nOtevřít ho?", "Konzolák Servis",
+        if (MessageBox.Show($"Soubor byl uložen:\n{cesta}\n\nOtevřít ho?", "Konzolak service app",
                 MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
             Process.Start(new ProcessStartInfo(cesta) { UseShellExecute = true });
     }
@@ -602,7 +602,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _log.Zapis($"Kontrola aktualizací se nezdařila: {ex.Message}");
-            if (!tiše) MessageBox.Show("Kontrola aktualizací se nezdařila. Zkontroluj připojení k internetu.", "Konzolák Servis");
+            if (!tiše) MessageBox.Show("Kontrola aktualizací se nezdařila. Zkontroluj připojení k internetu.", "Konzolak service app");
             return;
         }
         if (_nova == null && AktualizaceService.PosledniChyba != null)
@@ -611,7 +611,7 @@ public partial class MainWindow : Window
             VerzeInfo.Text = $"Verze {AktualizaceService.VerzeText} · aktualizace nedostupné";
             VerzeInfo.ToolTip = AktualizaceService.PosledniChyba;
             if (!tiše) MessageBox.Show($"Nové verze teď nejde zkontrolovat.\n\n{AktualizaceService.PosledniChyba}",
-                "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Information);
+                "Konzolak service app", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (_nova != null)
@@ -621,7 +621,7 @@ public partial class MainWindow : Window
             _log.Zapis($"Dostupná nová verze {_nova.Tag}.");
         }
         else if (!tiše)
-            MessageBox.Show($"Používáš nejnovější verzi {AktualizaceService.VerzeText}.", "Konzolák Servis");
+            MessageBox.Show($"Používáš nejnovější verzi {AktualizaceService.VerzeText}.", "Konzolak service app");
     }
 
     private async void Aktualizovat_Click(object s, RoutedEventArgs e)
@@ -631,7 +631,7 @@ public partial class MainWindow : Window
         z.Shrnuti = $"Aktualizace z verze {AktualizaceService.VerzeText} na {_nova.Tag.TrimStart('v')}.";
         Vykresli(z); ZalozkaVysledek.IsChecked = true;
         if (MessageBox.Show($"Stáhnout a nainstalovat verzi {_nova.Tag}?\nAplikace se poté sama restartuje.",
-                "Aktualizace Konzolák Servis", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                "Aktualizace Konzolak service app", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
         _cts = new CancellationTokenSource();
         Aktualizovat.IsEnabled = false; Prubeh.Visibility = Visibility.Visible; Akce.IsEnabled = false;
@@ -644,7 +644,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _log.Zapis($"Aktualizace selhala: {ex.Message}");
-            MessageBox.Show($"Aktualizace se nezdařila:\n{ex.Message}", "Konzolák Servis", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Aktualizace se nezdařila:\n{ex.Message}", "Konzolak service app", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
