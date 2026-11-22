@@ -17,11 +17,17 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Zámek na heslo – bez správného hesla se aplikace nespustí (ochrana proti spuštění zákazníkem).
+        // Po dobu dialogu hesla není otevřené žádné hlavní okno; bez OnExplicitShutdown by se aplikace
+        // po zavření dialogu sama ukončila (OnLastWindowClose) a hlavní okno by se vůbec neotevřelo.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         if (!HesloOkno.Overit())
         {
             Shutdown();
             return;
         }
-        new MainWindow().Show();
+        var okno = new MainWindow();
+        MainWindow = okno;
+        ShutdownMode = ShutdownMode.OnLastWindowClose;
+        okno.Show();
     }
 }
