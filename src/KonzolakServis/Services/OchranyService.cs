@@ -58,6 +58,14 @@ public static class OchranyService
         return !string.Equals(v, "Off", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Blokování potenciálně nežádoucích aplikací (PUA) – součást Ochrany na základě reputace. (null = nelze zjistit)</summary>
+    private static bool? PuaZapnuty()
+    {
+        var mp = Wmi(@"root\Microsoft\Windows\Defender", "SELECT PUAProtection FROM MSFT_MpPreference");
+        if (mp?["PUAProtection"] is null) return null;
+        try { return Convert.ToInt32(mp["PUAProtection"]) == 1; } catch { return null; }
+    }
+
     // ---------- Hromadné akce ----------
 
     private static async Task<string> VypnoutVse(IProgress<string> l, CancellationToken c)
@@ -66,9 +74,9 @@ public static class OchranyService
 
         await ProcessRunner.PowerShellAsync(
             "Set-MpPreference -DisableRealtimeMonitoring $true -DisableIOAVProtection $true " +
-            "-DisableBehaviorMonitoring $true -DisableScriptScanning $true -ErrorAction SilentlyContinue",
+            "-DisableBehaviorMonitoring $true -DisableScriptScanning $true -PUAProtection Disabled -ErrorAction SilentlyContinue",
             l, c);
-        if (DefenderZapnuty() == false) vysledky.Add("ochrana Defenderu v reálném čase vypnuta");
+        if (DefenderZapnuty() == false) vysledky.Add("ochrana Defenderu v reálném čase a blokování nežádoucích aplikací (PUA) vypnuto");
         else if (TamperOchrana())
             vysledky.Add("Defender NELZE vypnout – je zapnutá Ochrana proti neoprávněným změnám (Tamper Protection). " +
                          "Vypněte ji ručně v Zabezpečení Windows → Ochrana před viry a hrozbami → Spravovat nastavení.");
@@ -93,13 +101,14 @@ public static class OchranyService
     {
         await ProcessRunner.PowerShellAsync(
             "Set-MpPreference -DisableRealtimeMonitoring $false -DisableIOAVProtection $false " +
-            "-DisableBehaviorMonitoring $false -DisableScriptScanning $false -ErrorAction SilentlyContinue",
+            "-DisableBehaviorMonitoring $false -DisableScriptScanning $false -PUAProtection Enabled -ErrorAction SilentlyContinue",
             l, c);
         await ProcessRunner.RunAsync("netsh.exe", "advfirewall set allprofiles state on", l, c);
         await ProcessRunner.PowerShellAsync(
             "New-ItemProperty -Path 'HKLM:\\" + ExplorerKlic +
             "' -Name SmartScreenEnabled -Value 'Warn' -PropertyType String -Force | Out-Null", l, c);
-        return "Ochrany zase zapnuty: Defender v reálném čase, firewall ve všech profilech i SmartScreen.";
+        return "Ochrany zase zapnuty: Defender v reálném čase, firewall ve všech profilech, SmartScreen " +
+               "i ochrana na základě reputace (blokování nežádoucích aplikací – PUA).";
     }
 
     private static List<string> CizíAntiviry() =>
@@ -147,12 +156,17 @@ public static class OchranyService
         s.Pridej("SmartScreen pro aplikace", SmartScreenZapnuty() ? "zapnutý" : "VYPNUTÝ",
             SmartScreenZapnuty() ? Stav.Ok : Stav.Varovani);
 
+        var pua = PuaZapnuty();
+        if (pua != null)
+            s.Pridej("Ochrana na základě reputace (PUA)", pua == true ? "zapnutá" : "VYPNUTÁ",
+                pua == true ? Stav.Ok : Stav.Varovani, "Blokování potenciálně nežádoucích aplikací ve Windows.");
+
         var jine = CizíAntiviry();
         foreach (var n in jine)
             s.Pridej(n, "jiný antivirus", Stav.Info,
                 "Jiný antivirus než Defender aplikace vypnout neumí. Pozastavte jeho ochranu ručně – ikonou u hodin (pravé tlačítko → pozastavit ochranu).");
 
-        var vypnuto = def == false || fwZap == 0 || !SmartScreenZapnuty();
+        var vypnuto = def == false || fwZap == 0 || !SmartScreenZapnuty() || pua == false;
         z.Stav = vypnuto ? Stav.Varovani : Stav.Ok;
         z.Shrnuti = vypnuto
             ? "Některé ochrany jsou VYPNUTÉ. Po instalaci je znovu zapněte tlačítkem „Znovu zapnout všechny ochrany“."

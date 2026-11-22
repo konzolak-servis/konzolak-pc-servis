@@ -1,3 +1,6 @@
+## 0.17
+- Vypnutí ochran: „Znovu zapnout všechny ochrany" nyní obnoví i Ochranu na základě reputace (blokování potenciálně nežádoucích aplikací – PUA), ne jen Defender, firewall a SmartScreen. Vypnutí a zapnutí je symetrické. V přehledu přibyl stav PUA.
+
 ## 0.16
 - Oprava: akce využívající PowerShell (např. vypnutí ochran, čištění, opravy) fungují i když je aplikace spuštěná ze složky na OneDrive (Plocha, Dokumenty). Dřív hlásily „Přístup byl odepřen".
 - Sjednocen název v oknech a hláškách na „Konzolak service app".
