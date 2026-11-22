@@ -1,3 +1,6 @@
+## 0.15
+- Oprava: po zadání správného hesla se aplikace spustí (hlavní okno se nyní správně otevře).
+
 ## 0.14
 - Spuštění aplikace je nově chráněné heslem – bez správného hesla se nástroj nespustí (ochrana proti tomu, aby ho spustil sám zákazník). V Nástrojích → „Změnit heslo pro spuštění" si můžeš nastavit vlastní heslo, které se uloží jen do daného počítače.
 - Aplikace se přejmenovala na „Konzolak service app" (název okna i souboru .exe).
