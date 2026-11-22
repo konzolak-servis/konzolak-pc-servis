@@ -62,6 +62,11 @@ public static class ServisniKatalog
             Spustit = ZarizeniService.ZpravaAsync },
 
         new() {
+            Nazev = "Dočasně vypnout ochrany (instalace programů)", Kategorie = Kategorie.Nastroje,
+            Popis = "Jedním tlačítkem dočasně vypne Defender, firewall i SmartScreen, když brání instalaci programu. Stejně jednoduše je zase zapne. Používat jen krátce a pak ochrany obnovit.",
+            Spustit = async (log, ct) => Vysl(await OchranyService.ZpravaAsync(log, ct)) },
+
+        new() {
             Nazev = "Benchmark PC", Kategorie = Kategorie.Diagnostika,
             Popis = "Výkon procesoru (1 jádro / všechna), paměti, grafiky a disku. Skóre, porovnání s obvyklými výsledky a historie testů.",
             Spustit = BenchmarkPcService.SpustAsync },
