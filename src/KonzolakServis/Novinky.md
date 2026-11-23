@@ -1,3 +1,6 @@
+## 0.23
+- Oprava zaseknutí: po otevření „Dočasně vypnout ochrany" (a při vypínání/zapínání) se stránka na některých počítačích zasekla na „Probíhá…" donekonečna, když systémové rozhraní Defenderu (WMI) neodpovědělo. Nově má každé čtení i každý zápis časový limit (několik sekund), takže stránka se vždycky dokončí a ukáže výsledek, i kdyby byl Defender zrovna zaneprázdněný. V záložce „Podrobný log" je teď vidět průběžně, co se právě zjišťuje.
+
 ## 0.22
 - Oprava reputačního blokování (PUA): nastavuje se teď přes systémové rozhraní Defenderu (WMI PUAProtection), ne přes registrový klíč, který byl na některých počítačích zamčený právy (hlásilo „Přístup byl odepřen 0x80070005"). Vypnutí i zapnutí reputace by mělo projít.
 - Oprava „Znovu zapnout všechny ochrany": zapnutí Defenderu v reálném čase občas projde bez chyby, ale systém stav zase vrátil zpět. Nově se nejdřív smažou zásady, které Defender držely vypnutý, a zapnutí se několikrát zopakuje s krátkou prodlevou a ověřením, takže se realtime ochrana opravdu zapne.

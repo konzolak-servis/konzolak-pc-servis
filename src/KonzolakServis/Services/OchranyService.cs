@@ -41,7 +41,20 @@ public static class OchranyService
 
     // ---------- pomocné (WMI / registr / COM, vše in-process) ----------
 
-    private static ManagementBaseObject? Wmi(string scope, string dotaz)
+    // Pojistka proti zaseknutí: f poběží na vlákně a čeká se nejvýš ms. Když WMI/COM provider neodpoví
+    // (na některých PC se dotaz na Defender zasekne napořád), vrátí se záloha a pokračuje se dál –
+    // zaseknuté vlákno doběhne samo na pozadí. Díky tomu okno NIKDY nevisí donekonečna.
+    private static T SLimitem<T>(Func<T> f, T zaloha, int ms = 4000)
+    {
+        try
+        {
+            var t = Task.Run(f);
+            return t.Wait(ms) && !t.IsFaulted ? t.Result : zaloha;
+        }
+        catch { return zaloha; }
+    }
+
+    private static ManagementBaseObject? Wmi(string scope, string dotaz) => SLimitem<ManagementBaseObject?>(() =>
     {
         try
         {
@@ -50,9 +63,9 @@ public static class OchranyService
         }
         catch { }
         return null;
-    }
+    }, null);
 
-    private static IEnumerable<ManagementBaseObject> WmiVse(string scope, string dotaz)
+    private static IEnumerable<ManagementBaseObject> WmiVse(string scope, string dotaz) => SLimitem<IEnumerable<ManagementBaseObject>>(() =>
     {
         var list = new List<ManagementBaseObject>();
         try
@@ -62,7 +75,7 @@ public static class OchranyService
         }
         catch { }
         return list;
-    }
+    }, new List<ManagementBaseObject>());
 
     private static bool JsemSpravce()
     {
@@ -86,12 +99,18 @@ public static class OchranyService
 
     private static void SetMp(Action<ManagementBaseObject> nastav)
     {
-        var scope = new ManagementScope(@"\\.\" + DefenderScope);
-        scope.Connect();
-        using var mc = new ManagementClass(scope, new ManagementPath("MSFT_MpPreference"), null);
-        using var inParams = mc.GetMethodParameters("Set");
-        nastav(inParams);
-        mc.InvokeMethod("Set", inParams, null);
+        var hotovo = Task.Run(() =>
+        {
+            var scope = new ManagementScope(@"\\.\" + DefenderScope);
+            scope.Connect();
+            using var mc = new ManagementClass(scope, new ManagementPath("MSFT_MpPreference"), null);
+            using var inParams = mc.GetMethodParameters("Set");
+            nastav(inParams);
+            mc.InvokeMethod("Set", inParams, null);
+        });
+        if (!hotovo.Wait(6000))
+            throw new TimeoutException("Nastavení Defenderu přes WMI neodpovědělo do 6 s – zaseknutý WMI provider nebo služba Defenderu (Antimalware Service).");
+        if (hotovo.IsFaulted && hotovo.Exception?.InnerException is { } ex) throw ex;
     }
 
     private static void RegStr(string hive, string cesta, string nazev, string hodnota)
@@ -112,15 +131,19 @@ public static class OchranyService
         Exception? comEx = null;
         try
         {
-            var t = Type.GetTypeFromProgID("HNetCfg.FwPolicy2");
-            if (t != null)
+            // COM s časovým limitem – ať se zápis přes firewall nemůže zaseknout napořád.
+            var hotovo = Task.Run(() =>
             {
+                var t = Type.GetTypeFromProgID("HNetCfg.FwPolicy2")
+                        ?? throw new InvalidOperationException("Rozhraní firewallu (HNetCfg.FwPolicy2) není dostupné.");
                 var fw = Activator.CreateInstance(t);
                 foreach (var prof in new[] { 1, 2, 4 }) // doména, soukromá, veřejná
                     t.InvokeMember("FirewallEnabled", BindingFlags.SetProperty, null, fw, new object[] { prof, zapnout });
-                return "COM (HNetCfg.FwPolicy2)";
-            }
-            comEx = new InvalidOperationException("Rozhraní firewallu (HNetCfg.FwPolicy2) není dostupné.");
+            });
+            if (!hotovo.Wait(5000))
+                throw new TimeoutException("Rozhraní firewallu (COM) neodpovědělo do 5 s.");
+            if (hotovo.IsFaulted && hotovo.Exception?.InnerException is { } fex) throw fex;
+            return "COM (HNetCfg.FwPolicy2)";
         }
         catch (Exception ex) { comEx = ex; }
 
@@ -205,7 +228,7 @@ public static class OchranyService
     private static void ZapniDefenderRealtime()
     {
         VymazDefenderZasady();
-        for (int pokus = 0; pokus < 4; pokus++)
+        for (int pokus = 0; pokus < 3; pokus++)
         {
             SetMp(p =>
             {
@@ -216,7 +239,7 @@ public static class OchranyService
                 p["PUAProtection"] = (byte)1;
             });
             if (DefenderZapnuty() == true) return;
-            System.Threading.Thread.Sleep(600);
+            System.Threading.Thread.Sleep(500);
         }
     }
 
@@ -403,48 +426,64 @@ public static class OchranyService
         if (_diag.Count > 0)
             z.HromadneAkce.Add(new AkceRadku("Zkopírovat diagnostiku", ZkopirovatDiagnostiku));
 
+        // Všechny stavy přečteme JEDNOU a s hlášením průběhu (každé čtení má časový limit v Wmi()/MpPref()).
+        log.Report("Zjišťuji oprávnění…");
+        var spravce = JsemSpravce();
+        log.Report("Čtu stav Defenderu…");
+        var def = DefenderZapnuty();
+        log.Report("Čtu Ochranu proti neoprávněným změnám…");
+        var tamper = TamperOchrana();
+        log.Report("Čtu cloudovou ochranu…");
+        var cloud = CloudZapnuta();
+        log.Report("Čtu odesílání vzorků…");
+        var vzorky = VzorkyZapnute();
+        log.Report("Čtu firewall…");
+        var fwZap = FirewallZapnutoProfilu();
+        log.Report("Čtu SmartScreen…");
+        var smartScreen = SmartScreenZapnuty();
+        log.Report("Čtu reputační ochranu (PUA)…");
+        var pua = PuaZapnuty();
+        log.Report("Hledám cizí antiviry…");
+        var cizi = CizíAntiviry();
+        log.Report("Sestavuji přehled…");
+
         var s = z.PridejSekci("Aktuální stav ochran");
         s.Pridej("Verze aplikace", AktualizaceService.VerzeText, Stav.Info);
 
-        if (!JsemSpravce())
+        if (!spravce)
             s.Pridej("Oprávnění", "aplikace neběží jako správce", Stav.Varovani,
                 "Bez práv správce nejde ochrany měnit. Spusťte aplikaci pravým tlačítkem → „Spustit jako správce“.");
 
-        var def = DefenderZapnuty();
         if (def == null)
             s.Pridej("Windows Defender", "není na tomto PC", Stav.Info);
         else
         {
             s.Pridej("Defender – ochrana v reálném čase", def == true ? "zapnutá" : "VYPNUTÁ",
                 def == true ? Stav.Ok : Stav.Varovani);
-            if (TamperOchrana())
+            if (tamper)
                 s.Pridej("Ochrana proti neoprávněným změnám", "ZAPNUTÁ", Stav.Varovani,
                     "Tamper Protection brání aplikaci měnit Defender (realtime, cloud, vzorky). Pokud chcete Defender "
                     + "vypnout, vypněte ji ručně: Zabezpečení Windows → Ochrana před viry a hrozbami → Spravovat nastavení.");
 
-            var cloud = CloudZapnuta();
             if (cloud != null)
                 s.Pridej("Cloudová ochrana", cloud == true ? "zapnutá" : "VYPNUTÁ",
                     cloud == true ? Stav.Ok : Stav.Varovani, "MAPSReporting – ochrana z cloudu Microsoftu.");
-            var vzorky = VzorkyZapnute();
             if (vzorky != null)
                 s.Pridej("Automatické odesílání vzorků", vzorky == true ? "zapnuté" : "VYPNUTÉ",
                     vzorky == true ? Stav.Ok : Stav.Varovani, "SubmitSamplesConsent – odesílání podezřelých souborů Microsoftu.");
         }
 
-        var fwZap = FirewallZapnutoProfilu();
         s.Pridej("Firewall", fwZap == 0 ? "VYPNUTÝ ve všech profilech" : fwZap == 3 ? "zapnutý" : $"zapnutý v {fwZap} ze 3 profilů",
             fwZap == 0 ? Stav.Varovani : Stav.Ok);
 
-        s.Pridej("SmartScreen pro aplikace", SmartScreenZapnuty() ? "zapnutý" : "VYPNUTÝ",
-            SmartScreenZapnuty() ? Stav.Ok : Stav.Varovani);
+        s.Pridej("SmartScreen pro aplikace", smartScreen ? "zapnutý" : "VYPNUTÝ",
+            smartScreen ? Stav.Ok : Stav.Varovani);
 
-        var pua = PuaZapnuty();
         if (pua != null)
             s.Pridej("Ochrana na základě reputace (PUA)", pua == true ? "zapnutá" : "VYPNUTÁ",
                 pua == true ? Stav.Ok : Stav.Varovani, "Blokování potenciálně nežádoucích aplikací ve Windows.");
 
-        foreach (var n in CizíAntiviry())
+        foreach (var n in cizi)
             s.Pridej(n, "jiný antivirus", Stav.Info,
                 "Jiný antivirus než Defender aplikace vypnout neumí. Pozastavte jeho ochranu ručně – ikonou u hodin (pravé tlačítko → pozastavit ochranu).");
 
@@ -454,15 +493,15 @@ public static class OchranyService
             var d = z.PridejSekci($"Diagnostika poslední akce ({_diagAkce}, {_diagCas:HH:mm:ss})");
             d.Popis = "Co se při poslední akci u každé ochrany skutečně stalo. Když něco selhalo, je tu přesný důvod. "
                     + "Tlačítkem „Zkopírovat diagnostiku“ nahoře to zkopírujete celé.";
-            if (TamperOchrana())
+            if (tamper)
                 d.Pridej("Tamper Protection", "ZAPNUTÁ", Stav.Varovani,
                     "Dokud je zapnutá, žádná aplikace nezmění Defender (realtime, cloud, vzorky). Vypněte ji ručně v Zabezpečení Windows.");
             foreach (var p in _diag)
                 d.Pridej(p.Nazev, p.Ok ? "OK" : "CHYBA", p.Ok ? Stav.Ok : Stav.Chyba, p.Detail);
         }
 
-        var vypnuto = def == false || fwZap == 0 || !SmartScreenZapnuty() || pua == false
-                      || CloudZapnuta() == false || VzorkyZapnute() == false;
+        var vypnuto = def == false || fwZap == 0 || !smartScreen || pua == false
+                      || cloud == false || vzorky == false;
         z.Stav = vypnuto ? Stav.Varovani : Stav.Ok;
         z.Shrnuti = vypnuto
             ? "Některé ochrany jsou VYPNUTÉ. Po instalaci je znovu zapněte tlačítkem „Znovu zapnout všechny ochrany“."
