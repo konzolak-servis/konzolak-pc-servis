@@ -1,3 +1,7 @@
+## 0.20
+- Oprava: vypínání a zapínání ochran na některých počítačích hlásilo „Přístup byl odepřen" (nešlo spustit powershell.exe). Nově aplikace nic nespouští – všechno nastavuje přímo (Defender přes systémové rozhraní WMI, firewall přes jeho rozhraní, SmartScreen přes registr). Mělo by to teď fungovat i tam, kde je spouštění skriptů zablokované.
+- Když aplikace neběží jako správce, místo nejasné chyby to rovnou napíše a poradí spustit ji jako správce. U každé ochrany, kterou se nepodaří přepnout (např. kvůli Ochraně proti neoprávněným změnám), se ukáže srozumitelný důvod.
+
 ## 0.19
 - Velká oprava vypínání ochran: tlačítko „Znovu zapnout všechny ochrany" teď vrátí úplně všechno zpět. Vypnutí ochrany v reálném čase ve Windows totiž kaskádově vypne i cloudovou ochranu, automatické odesílání vzorků a blokování při prvním výskytu – a ty se samy znovu nezapnuly. Zapínání je nově napsané tak, že nastaví celý ochranný stav najednou: ochrana v reálném čase, cloudová ochrana, odesílání vzorků, blokování při prvním výskytu, PUA/reputace, firewall, SmartScreen pro aplikace i pro aplikace z Microsoft Store.
 - V přehledu ochran přibyl stav cloudové ochrany a automatického odesílání vzorků, takže je po zapnutí vidět, že je opravdu všechno zelené.
