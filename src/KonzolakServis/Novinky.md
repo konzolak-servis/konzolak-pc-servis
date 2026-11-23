@@ -1,3 +1,7 @@
+## 0.22
+- Oprava reputačního blokování (PUA): nastavuje se teď přes systémové rozhraní Defenderu (WMI PUAProtection), ne přes registrový klíč, který byl na některých počítačích zamčený právy (hlásilo „Přístup byl odepřen 0x80070005"). Vypnutí i zapnutí reputace by mělo projít.
+- Oprava „Znovu zapnout všechny ochrany": zapnutí Defenderu v reálném čase občas projde bez chyby, ale systém stav zase vrátil zpět. Nově se nejdřív smažou zásady, které Defender držely vypnutý, a zapnutí se několikrát zopakuje s krátkou prodlevou a ověřením, takže se realtime ochrana opravdu zapne.
+
 ## 0.21
 - Ochrany: u každé položky (vzorky, firewall, SmartScreen, Defender) se teď po akci ověří, jestli se změna opravdu zapsala, a když ne, ukáže se přesná příčina (typ a kód chyby, nebo že hodnotu vrátila zpět zásada / Ochrana proti neoprávněným změnám). Přibyla sekce „Diagnostika poslední akce" a tlačítko „Zkopírovat diagnostiku", takže z jednoho výpisu je vidět, co přesně a proč selhalo.
 - Nástroje → „Zámek heslem při spuštění (zapnout/vypnout)": lze vypnout spouštění na heslo (výchozí heslo je ve veřejném zdrojáku slabé) a zase zapnout. Nastavení platí od příštího spuštění.

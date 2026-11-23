@@ -28,8 +28,6 @@ public static class OchranyService
 {
     private const string DefenderScope = @"root\Microsoft\Windows\Defender";
     private const string ExplorerKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer";
-    private const string DefenderKlic = @"SOFTWARE\Microsoft\Windows Defender";
-    private const string PuaHodnota = "SmartScreenPuaEnabled";
     private const string StoreKlic = @"SOFTWARE\Microsoft\Windows\CurrentVersion\AppHost";
     private const string StoreHodnota = "EnableWebContentEvaluation";
     private const string FirewallKlic = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
@@ -175,10 +173,51 @@ public static class OchranyService
         return !string.Equals(v, "Off", StringComparison.OrdinalIgnoreCase);
     }
 
+    // PUA (blokování nežádoucích aplikací) se řídí přes WMI PUAProtection (0=vyp, 1=zap, 2=audit).
+    // Registr HKLM\SOFTWARE\Microsoft\Windows Defender\SmartScreenPuaEnabled je zamčený ACL (zápis = 0x80070005),
+    // proto ho nepoužíváme ani k zápisu, ani ke čtení.
     private static bool? PuaZapnuty()
     {
-        var v = ZalohaService.CtiReg("HKLM", DefenderKlic, PuaHodnota);
-        return v == null ? (bool?)null : v != "0";
+        var v = MpPref("PUAProtection");
+        return v == null ? (bool?)null : v != 0;
+    }
+
+    // Zásady (GPO), které mohou držet Defender vypnutý i po zápisu přes WMI. Smažeme je, aby šel zase zapnout.
+    private static void VymazDefenderZasady()
+    {
+        try
+        {
+            using var k = ZalohaService.Koren("HKLM").OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows Defender", true);
+            if (k == null) return;
+            foreach (var n in new[] { "DisableAntiSpyware", "DisableAntiVirus" })
+                if (k.GetValue(n) != null) k.DeleteValue(n, false);
+            using var rtp = k.OpenSubKey("Real-Time Protection", true);
+            if (rtp != null)
+                foreach (var n in new[] { "DisableRealtimeMonitoring", "DisableBehaviorMonitoring",
+                                          "DisableOnAccessProtection", "DisableScanOnRealtimeEnable", "DisableIOAVProtection" })
+                    if (rtp.GetValue(n) != null) rtp.DeleteValue(n, false);
+        }
+        catch { }
+    }
+
+    // Zapnutí Defenderu v reálném čase bývá „líné" – WMI zápis projde bez chyby, ale stav se vrátí zpět.
+    // Proto nejdřív smažeme blokující zásady a pak zápis několikrát zopakujeme s krátkou prodlevou a ověřením.
+    private static void ZapniDefenderRealtime()
+    {
+        VymazDefenderZasady();
+        for (int pokus = 0; pokus < 4; pokus++)
+        {
+            SetMp(p =>
+            {
+                p["DisableRealtimeMonitoring"] = false;
+                p["DisableIOAVProtection"] = false;
+                p["DisableBehaviorMonitoring"] = false;
+                p["DisableScriptScanning"] = false;
+                p["PUAProtection"] = (byte)1;
+            });
+            if (DefenderZapnuty() == true) return;
+            System.Threading.Thread.Sleep(600);
+        }
     }
 
     /// <summary>Je nastavení spravované zásadou (GPO)? Pak ho aplikace nepřepíše.</summary>
@@ -235,8 +274,8 @@ public static class OchranyService
         Krok(diag, "SmartScreen pro aplikace (vypnout)",
             () => RegStr("HKLM", ExplorerKlic, "SmartScreenEnabled", "Off"), () => !SmartScreenZapnuty(), "registr Explorer\\SmartScreenEnabled");
 
-        Krok(diag, "Reputační blokování PUA (vypnout)",
-            () => RegDword("HKLM", DefenderKlic, PuaHodnota, 0), () => PuaZapnuty() == false, "registr SmartScreenPuaEnabled");
+        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=0); ověříme jen výsledek.
+        Krok(diag, "Reputační blokování PUA (vypnout)", () => { }, () => PuaZapnuty() == false, "WMI PUAProtection");
 
         UlozDiag("Vypnout", diag);
         return Shrnuti(diag, true);
@@ -249,15 +288,8 @@ public static class OchranyService
 
         l.Report("Zapínám ochranu Defenderu v reálném čase…");
         Krok(diag, "Defender v reálném čase + PUA (zapnout)",
-            () => SetMp(p =>
-            {
-                p["DisableRealtimeMonitoring"] = false;
-                p["DisableIOAVProtection"] = false;
-                p["DisableBehaviorMonitoring"] = false;
-                p["DisableScriptScanning"] = false;
-                p["PUAProtection"] = (byte)1;
-            }),
-            () => DefenderZapnuty() == true, "WMI MSFT_MpPreference.Set");
+            ZapniDefenderRealtime,
+            () => DefenderZapnuty() == true, "WMI MSFT_MpPreference.Set (smazání zásad + opakování)");
 
         l.Report("Zapínám cloudovou ochranu…");
         Krok(diag, "Cloudová ochrana (zapnout)",
@@ -282,8 +314,8 @@ public static class OchranyService
         Krok(diag, "SmartScreen pro aplikace (zapnout)",
             () => RegStr("HKLM", ExplorerKlic, "SmartScreenEnabled", "Warn"), () => SmartScreenZapnuty(), "registr Explorer\\SmartScreenEnabled");
 
-        Krok(diag, "Reputační blokování PUA (zapnout)",
-            () => RegDword("HKLM", DefenderKlic, PuaHodnota, 1), () => PuaZapnuty() == true, "registr SmartScreenPuaEnabled");
+        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=1); ověříme jen výsledek.
+        Krok(diag, "Reputační blokování PUA (zapnout)", () => { }, () => PuaZapnuty() == true, "WMI PUAProtection");
 
         Krok(diag, "SmartScreen pro aplikace z Microsoft Store (zapnout)",
             () => RegDword("HKCU", StoreKlic, StoreHodnota, 1),
@@ -334,7 +366,7 @@ public static class OchranyService
         sb.AppendLine($"Správce: {(JsemSpravce() ? "ano" : "NE")}");
         sb.AppendLine($"Tamper Protection: {(TamperOchrana() ? "ZAPNUTÁ (brání změnám Defenderu)" : "vypnutá")}");
         sb.AppendLine($"Defender realtime: {StavText(DefenderZapnuty())}; cloud(MAPSReporting): {MpPref("MAPSReporting")}; vzorky(SubmitSamplesConsent): {MpPref("SubmitSamplesConsent")}");
-        sb.AppendLine($"Firewall zapnutý profilů: {FirewallZapnutoProfilu()}/3; SmartScreenEnabled: {ZalohaService.CtiReg("HKLM", ExplorerKlic, "SmartScreenEnabled") ?? "(nenastaveno)"}; PUA: {ZalohaService.CtiReg("HKLM", DefenderKlic, PuaHodnota) ?? "(nenastaveno)"}");
+        sb.AppendLine($"Firewall zapnutý profilů: {FirewallZapnutoProfilu()}/3; SmartScreenEnabled: {ZalohaService.CtiReg("HKLM", ExplorerKlic, "SmartScreenEnabled") ?? "(nenastaveno)"}; PUA(PUAProtection): {MpPref("PUAProtection")?.ToString() ?? "(nenastaveno)"}");
         var gpoSS = Zasada("HKLM", @"SOFTWARE\Policies\Microsoft\Windows\System", "EnableSmartScreen");
         var gpoSpynet = Zasada("HKLM", @"SOFTWARE\Policies\Microsoft\Windows Defender\Spynet", "SubmitSamplesConsent");
         if (gpoSS != null) sb.AppendLine("Zásada SmartScreen (GPO): " + gpoSS);
