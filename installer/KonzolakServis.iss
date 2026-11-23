@@ -57,4 +57,6 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
 
 [Run]
 ; Po běžné (nemlčící) instalaci nabídni spuštění. Při tiché aktualizaci se přeskočí – aplikace se spustí sama.
-Filename: "{app}\{#MyAppExe}"; Description: "Spustit {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; shellexec (ShellExecute) místo CreateProcess: aplikace má v manifestu requireAdministrator, takže přímé
+; CreateProcess z neelevovaného tokenu dokončovací stránky končí chybou 740. ShellExecute elevaci vyřeší.
+Filename: "{app}\{#MyAppExe}"; Description: "Spustit {#MyAppName}"; Flags: nowait postinstall skipifsilent shellexec
