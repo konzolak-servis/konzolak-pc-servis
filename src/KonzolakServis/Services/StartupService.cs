@@ -38,8 +38,27 @@ public static class StartupService
         Reg("HKLM", @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run", "Run32", "pro všechny uživatele (32bit)");
         Slozka("HKCU", Environment.GetFolderPath(Environment.SpecialFolder.Startup), "složka Po spuštění");
         Slozka("HKLM", Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), "složka Po spuštění (všichni)");
+
+        // Položky, které jsme museli vypnout odebráním z Run klíče – ať jdou zase zapnout zpět.
+        foreach (var kv in ZalohaService.SPrefixem(ZalohaPrefix))
+        {
+            var cast = kv.Key.Substring(ZalohaPrefix.Length).Split('\\', 3);
+            if (cast.Length != 3) continue;
+            var (hive, podklic, nazev) = (cast[0], cast[1], cast[2]);
+            if (list.Any(p => p.Hive == hive && p.ApprovedPodklic == podklic && p.Nazev == nazev)) continue;
+            var zdroj = podklic == "Run32" ? "pro všechny uživatele (32bit)" : hive == "HKLM" ? "pro všechny uživatele" : "pro tohoto uživatele";
+            list.Add(new Polozka(nazev, kv.Value, zdroj, hive, podklic, false));
+        }
         return list;
     }
+
+    private const string ZalohaPrefix = "startup:";
+
+    /// <summary>Cesta k Run klíči, ze kterého položka pochází.</summary>
+    private static string RunCesta(string hive, string podklic) => podklic == "Run32"
+        ? @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run"
+        : hive == "HKLM" ? @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+                         : @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     /// <summary>Hodnota ve StartupApproved: sudý první bajt = zapnuto, lichý = vypnuto, chybí = zapnuto.</summary>
     private static bool JeZapnuto(string hive, string podklic, string nazev)
@@ -50,13 +69,61 @@ public static class StartupService
 
     private static string KlicHodnoty(Polozka p) => p.ApprovedPodklic == "StartupFolder" ? Path.GetFileName(p.Prikaz) : p.Nazev;
 
-    public static void Nastav(Polozka p, bool zapnout)
+    /// <summary>
+    /// Zapne/vypne program po spuštění a vrátí popis výsledku. Při neúspěchu vyhodí výjimku s přesnou chybou.
+    /// U Run klíčů to děláme spolehlivě: hodnotu z Run klíče dočasně odebereme (a zapamatujeme),
+    /// takže se program nespustí ani na strojích, kde samotné „StartupApproved" (jako ve Správci úloh) neúčinkuje.
+    /// Zároveň nastavíme i StartupApproved, aby stav odpovídal i ve Správci úloh. Vše je plně vratné.
+    /// </summary>
+    public static string Nastav(Polozka p, bool zapnout)
     {
-        using var k = ZalohaService.Koren(p.Hive).CreateSubKey(Approved + p.ApprovedPodklic, true);
-        var data = new byte[12];
-        data[0] = (byte)(zapnout ? 0x02 : 0x03);
-        if (!zapnout) BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc()).CopyTo(data, 4);
-        k.SetValue(KlicHodnoty(p), data, RegistryValueKind.Binary);
+        // 1) StartupApproved (shoda se Správcem úloh) – best effort, nesmí shodit celou akci.
+        try
+        {
+            using var k = ZalohaService.Koren(p.Hive).CreateSubKey(Approved + p.ApprovedPodklic, true);
+            if (k != null)
+            {
+                var data = new byte[12];
+                data[0] = (byte)(zapnout ? 0x02 : 0x03);
+                if (!zapnout) BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc()).CopyTo(data, 4);
+                k.SetValue(KlicHodnoty(p), data, RegistryValueKind.Binary);
+            }
+        }
+        catch { /* na StartupApproved se nespoléháme, spolehlivý je krok 2 */ }
+
+        // 2) Spolehlivá cesta pro Run/Run32: odebrat / vrátit hodnotu přímo v Run klíči.
+        if (p.ApprovedPodklic is "Run" or "Run32")
+        {
+            var cesta = RunCesta(p.Hive, p.ApprovedPodklic);
+            var zalohaKlic = $"{ZalohaPrefix}{p.Hive}\\{p.ApprovedPodklic}\\{p.Nazev}";
+            using var rk = ZalohaService.Koren(p.Hive).OpenSubKey(cesta, true)
+                ?? throw new Exception($"nepodařilo se otevřít klíč registru {p.Hive}\\{cesta}.");
+
+            if (!zapnout)
+            {
+                var hodnota = rk.GetValue(p.Nazev)?.ToString() ?? p.Prikaz;
+                ZalohaService.Zapamatuj(zalohaKlic, hodnota);
+                rk.DeleteValue(p.Nazev, false);
+                rk.Flush();
+                if (rk.GetValue(p.Nazev) != null)
+                    throw new Exception($"{p.Nazev} nejde vypnout – hodnotu v registru se nepodařilo odebrat (chybí oprávnění?).");
+                return $"{p.Nazev}: vypnuto";
+            }
+
+            var puv = ZalohaService.Puvodni(zalohaKlic) ?? p.Prikaz;
+            if (rk.GetValue(p.Nazev) == null && !string.IsNullOrEmpty(puv))
+                rk.SetValue(p.Nazev, puv, RegistryValueKind.String);
+            rk.Flush();
+            ZalohaService.Zapomen(zalohaKlic);
+            if (rk.GetValue(p.Nazev) == null)
+                throw new Exception($"{p.Nazev} nejde zapnout – hodnotu v registru se nepodařilo vrátit.");
+            return $"{p.Nazev}: zapnuto";
+        }
+
+        // 3) Složka Po spuštění – řídí se StartupApproved (ověříme, že se zápis projevil).
+        if (JeZapnuto(p.Hive, p.ApprovedPodklic, KlicHodnoty(p)) != zapnout)
+            throw new Exception($"{p.Nazev}: změna se neprojevila (StartupApproved\\{p.ApprovedPodklic}).");
+        return $"{p.Nazev}: {(zapnout ? "zapnuto" : "vypnuto")}";
     }
 
     public static Task<Zprava> ZpravaAsync(IProgress<string> log, CancellationToken ct) => Task.Run(() =>
@@ -69,7 +136,7 @@ public static class StartupService
 
         var s = z.PridejSekci("Programy, které se spouštějí s Windows");
         s.Popis = "Vypnutí program neodinstaluje, jen ho nespustí automaticky. Kdykoli jde zapnout zpět (i ve Správci úloh).";
-        foreach (var p in polozky.OrderByDescending(p => p.Zapnuto).ThenBy(p => p.Nazev))
+        foreach (var p in polozky.OrderBy(p => p.Nazev, StringComparer.CurrentCultureIgnoreCase))
         {
             var info = Znalosti.Program(p.Nazev, p.Prikaz);
             var stav = !p.Zapnuto ? Stav.Info
@@ -80,9 +147,9 @@ public static class StartupService
                          $"Vliv na rychlost startu: {info.Vliv}\n" +
                          $"Spouští se {p.Zdroj}: {p.Prikaz}";
             var akce = p.Zapnuto
-                ? new AkceRadku("Vypnout", (_, _) => { Nastav(p, false); return Task.FromResult($"{p.Nazev}: vypnuto"); })
+                ? new AkceRadku("Vypnout", (_, _) => Task.FromResult(Nastav(p, false)))
                   { Doporucena = info.Doporuceni == Doporuceni.Vypnout }
-                : new AkceRadku("Zapnout", (_, _) => { Nastav(p, true); return Task.FromResult($"{p.Nazev}: zapnuto"); });
+                : new AkceRadku("Zapnout", (_, _) => Task.FromResult(Nastav(p, true)));
             s.Pridej(info.Nazev == p.Nazev ? p.Nazev : $"{p.Nazev} ({info.Nazev})",
                 p.Zapnuto ? "Zapnuto" : "Vypnuto", stav, detail, akce);
         }
@@ -91,7 +158,7 @@ public static class StartupService
         if (kVypnuti.Count > 0)
             z.HromadneAkce.Add(new AkceRadku($"Vypnout doporučené ({kVypnuti.Count})", (log2, _) =>
             {
-                foreach (var p in kVypnuti) { Nastav(p, false); log2.Report($"{p.Nazev}: vypnuto"); }
+                foreach (var p in kVypnuti) log2.Report(Nastav(p, false));
                 return Task.FromResult($"Vypnuto {kVypnuti.Count} programů. Projeví se při příštím spuštění Windows.");
             })
             { Doporucena = true, Potvrzeni = $"Vypnout {kVypnuti.Count} programů, které se doporučuje nespouštět automaticky?\n\n" +
