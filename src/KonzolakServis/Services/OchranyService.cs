@@ -297,8 +297,13 @@ public static class OchranyService
         Krok(diag, "SmartScreen pro aplikace (vypnout)",
             () => RegStr("HKLM", ExplorerKlic, "SmartScreenEnabled", "Off"), () => !SmartScreenZapnuty(), "registr Explorer\\SmartScreenEnabled");
 
-        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=0); ověříme jen výsledek.
-        Krok(diag, "Reputační blokování PUA (vypnout)", () => { }, () => PuaZapnuty() == false, "WMI PUAProtection");
+        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=0). Když ho systém nedovolí
+        // vypnout (drží si ho), NENÍ to chyba – PUA nebrání instalaci programu a klidně může zůstat zapnuté.
+        // Proto jen informativní řádek (Ok=true), ne chyba, ať to nestraší červeně.
+        diag.Add(PuaZapnuty() == false
+            ? new Polozka("Reputační blokování PUA (vypnout)", true, "OK – WMI PUAProtection")
+            : new Polozka("Reputační blokování PUA (vypnout)", true,
+                "Ponecháno zapnuté – systém ho nedovolil vypnout. Nevadí: PUA (reputace) nebrání instalaci programu."));
 
         UlozDiag("Vypnout", diag);
         return Shrnuti(diag, true);

@@ -1,3 +1,6 @@
+## 0.24
+- Vypínání reputačního blokování (PUA): když ho Windows nedovolí vypnout (drží si ho sám), nehlásí se to už jako červená chyba. PUA totiž nebrání instalaci programu a klidně může zůstat zapnuté – v diagnostice je teď jen informativní poznámka místo chyby.
+
 ## 0.23
 - Oprava zaseknutí: po otevření „Dočasně vypnout ochrany" (a při vypínání/zapínání) se stránka na některých počítačích zasekla na „Probíhá…" donekonečna, když systémové rozhraní Defenderu (WMI) neodpovědělo. Nově má každé čtení i každý zápis časový limit (několik sekund), takže stránka se vždycky dokončí a ukáže výsledek, i kdyby byl Defender zrovna zaneprázdněný. V záložce „Podrobný log" je teď vidět průběžně, co se právě zjišťuje.
 
