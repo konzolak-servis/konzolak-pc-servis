@@ -1,3 +1,6 @@
+## 0.27
+- Oprava instalátoru: na konci instalace hlásil „CreateProcess selhala; kód 740 – vyžaduje zvýšená oprávnění" a aplikaci nespustil. Aplikace vyžaduje práva správce, a instalátor ji na dokončovací stránce spouštěl neelevovaně. Nově se spouští přes ShellExecute, takže se korektně vyžádá oprávnění a aplikace naběhne. (Tiché automatické aktualizace uvnitř aplikace fungují beze změny.)
+
 ## 0.26
 - Vypínání ochrany v reálném čase je teď spolehlivé i tam, kde Windows přepíná stav se zpožděním: po zápisu se počká a ověří skutečný stav, a pokud nenaskočí, pokus se zopakuje. Dřív „Vypnout" občas nahlásilo chybu, i když se vypnutí za chvíli projevilo. Když Windows vypnutí vůbec nedovolí, aplikace to napíše a nabídne tlačítko „Otevřít Zabezpečení Windows" k ručnímu vypnutí.
 
