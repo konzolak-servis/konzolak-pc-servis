@@ -272,6 +272,35 @@ public static class OchranyService
         return false;
     }
 
+    // Vypnutí realtime má stejnou záludnost jako zapnutí: WMI zápis projde, ale MSFT_MpComputerStatus se přepne
+    // až po pár sekundách (nebo Windows stav vrací zpět). Proto zápis několikrát zopakujeme a ověříme až po prodlevě.
+    // Vrací true, když je realtime opravdu vypnutý (čteno z MSFT_MpComputerStatus.RealTimeProtectionEnabled).
+    private static bool VypniDefenderRealtime(IProgress<string>? l = null)
+    {
+        var prodlevy = new[] { 1500, 3000, 4000 };
+        for (int pokus = 0; pokus < prodlevy.Length; pokus++)
+        {
+            try
+            {
+                SetMp(p =>
+                {
+                    p["DisableRealtimeMonitoring"] = true;
+                    p["DisableIOAVProtection"] = true;
+                    p["DisableBehaviorMonitoring"] = true;
+                    p["DisableScriptScanning"] = true;
+                    p["PUAProtection"] = (byte)0;
+                });
+            }
+            catch (Exception ex) { l?.Report($"Pokus {pokus + 1}: zápis selhal – {Detail(ex)}"); }
+
+            l?.Report($"Pokus {pokus + 1}/{prodlevy.Length}: čekám {prodlevy[pokus] / 1000.0:0.#} s na přepnutí stavu…");
+            System.Threading.Thread.Sleep(prodlevy[pokus]);
+            if (DefenderZapnuty() == false) { l?.Report("Defender v reálném čase je vypnutý."); return true; }
+        }
+        l?.Report("Defender v reálném čase se vypnout nepodařilo – Windows ho drží zapnutý.");
+        return false;
+    }
+
     /// <summary>Je nastavení spravované zásadou (GPO)? Pak ho aplikace nepřepíše.</summary>
     private static string? Zasada(string hive, string cesta, string nazev)
     {
@@ -306,16 +335,15 @@ public static class OchranyService
         var diag = new List<Polozka>();
 
         l.Report("Vypínám ochranu Defenderu v reálném čase…");
-        Krok(diag, "Defender v reálném čase + PUA (vypnout)",
-            () => SetMp(p =>
-            {
-                p["DisableRealtimeMonitoring"] = true;
-                p["DisableIOAVProtection"] = true;
-                p["DisableBehaviorMonitoring"] = true;
-                p["DisableScriptScanning"] = true;
-                p["PUAProtection"] = (byte)0;
-            }),
-            () => DefenderZapnuty() == false, "WMI MSFT_MpPreference.Set");
+        if (DefenderZapnuty() == null)
+            diag.Add(new Polozka("Defender v reálném čase (vypnout)", true, "Defender na tomto PC není – přeskočeno."));
+        else if (VypniDefenderRealtime(l))
+            diag.Add(new Polozka("Defender v reálném čase (vypnout)", true, "OK – WMI MSFT_MpPreference.Set (po ověření stavu)"));
+        else
+            diag.Add(new Polozka("Defender v reálném čase (vypnout)", false,
+                "Zapsáno bez chyby, ale Windows ochranu v reálném čase nevypnul ani po opakovaných pokusech a čekání. "
+                + "Na tomto PC si stav drží sám systém (umí ho zapínat zpět). Vypni/pozastav ho prosím ručně tlačítkem "
+                + "„Otevřít Zabezpečení Windows“ níže (Ochrana před viry a hrozbami → Spravovat nastavení → Ochrana v reálném čase = Vypnuto)."));
 
         l.Report("Vypínám firewall…");
         string mech = "";
