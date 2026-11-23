@@ -31,10 +31,6 @@ jobs:
 
       - run: dotnet publish src/KonzolakServis/KonzolakServis.csproj -c Release -o publish -p:CisloBuildu=${{ github.run_number }}
 
-      - name: Pojmenovat podle verze
-        shell: pwsh
-        run: Rename-Item publish/KonzolakServis.exe "KonzolakServiceApp_v${{ steps.verze.outputs.verze }}.exe"
-
       # Podpis přes Azure Trusted Signing (Microsoft). Potřebné secrets:
       # AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
       # TRUSTED_SIGNING_ENDPOINT, TRUSTED_SIGNING_ACCOUNT, TRUSTED_SIGNING_PROFILE
@@ -54,12 +50,38 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      # Sestavení klasického instalátoru (Inno Setup). Zdrojem je publish\KonzolakServis.exe.
+      - name: Sestavit instalátor (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=${{ steps.verze.outputs.verze }}" installer\KonzolakServis.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC selhal ($LASTEXITCODE)" }
+
+      # Podpis instalátoru (stejné secrets jako výše).
+      - name: Podepsat instalátor
+        if: env.PODEPSAT == 'true'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\installer_out
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - uses: actions/upload-artifact@v4
         with:
-          name: KonzolakServiceApp_v${{ steps.verze.outputs.verze }}
-          path: publish/KonzolakServiceApp_v${{ steps.verze.outputs.verze }}.exe
+          name: KonzolakServis_Setup_v${{ steps.verze.outputs.verze }}
+          path: installer_out/KonzolakServis_Setup_v${{ steps.verze.outputs.verze }}.exe
 
-      # Každý build z větve main = nové vydání. Z něj si aplikace stahuje aktualizace.
+      # Každý build z větve main = nové vydání. Z něj si aplikace stahuje aktualizace (instalátor).
       - name: Vydat verzi
         if: github.ref == 'refs/heads/main'
         shell: pwsh
@@ -72,4 +94,4 @@ jobs:
           $sekce = ($text -split '(?m)^## ')[1]
           $popis = ($sekce -split "`n", 2)[1].Trim()
           Set-Content poznamky.md $popis -Encoding UTF8
-          gh release create "v$verze" "publish/KonzolakServiceApp_v$verze.exe" --title "Konzolak service app $verze" --notes-file poznamky.md
+          gh release create "v$verze" "installer_out/KonzolakServis_Setup_v$verze.exe" --title "Konzolak service app $verze" --notes-file poznamky.md

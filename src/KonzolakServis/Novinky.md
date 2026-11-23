@@ -1,3 +1,8 @@
+## 0.25
+- Nově je aplikace jako **klasický instalátor** (místo portable .exe): nainstaluje se do Program Files, udělá zástupce na ploše i v nabídce Start a jde normálně odinstalovat přes Přidat/Odebrat programy. Ikona i název zůstávají stejné.
+- **Aktualizace se už samy přepíšou** – není potřeba ručně mazat starou verzi. Aplikace stáhne nový instalátor, tiše ho na pozadí spustí a sama se restartuje do nové verze.
+- První přechod z portable verze: stáhni a spusť jednou instalátor z vydání (odkaz najdeš u verze na GitHubu). Od té doby už se vše aktualizuje automaticky.
+
 ## 0.24
 - Spolehlivější zapnutí Defenderu v reálném čase při „Znovu zapnout": nově se smažou i skutečná nastavení v registru (nejen zásady), realtime se zapisuje samostatně a po zápisu se několik sekund počká, než se ověří stav (Windows ho přepíná se zpožděním). V Podrobném logu je vidět, který pokus zabral.
 - Nové tlačítko „Otevřít Zabezpečení Windows": když Windows odmítne zapnout ochranu v reálném čase programově (na některých počítačích si stav drží sám systém), appka to teď poctivě napíše a tímto tlačítkem rovnou otevře stránku Ochrana před viry a hrozbami, kde se dá přepnout ručně.
