@@ -1,3 +1,8 @@
+## 0.24
+- Spolehlivější zapnutí Defenderu v reálném čase při „Znovu zapnout": nově se smažou i skutečná nastavení v registru (nejen zásady), realtime se zapisuje samostatně a po zápisu se několik sekund počká, než se ověří stav (Windows ho přepíná se zpožděním). V Podrobném logu je vidět, který pokus zabral.
+- Nové tlačítko „Otevřít Zabezpečení Windows": když Windows odmítne zapnout ochranu v reálném čase programově (na některých počítačích si stav drží sám systém), appka to teď poctivě napíše a tímto tlačítkem rovnou otevře stránku Ochrana před viry a hrozbami, kde se dá přepnout ručně.
+- Vypínání reputačního blokování (PUA): když ho Windows nedovolí vypnout (drží si ho sám), nehlásí se to už jako červená chyba. PUA totiž nebrání instalaci programu a klidně může zůstat zapnuté – v diagnostice je teď jen informativní poznámka místo chyby.
+
 ## 0.23
 - Oprava zaseknutí: po otevření „Dočasně vypnout ochrany" (a při vypínání/zapínání) se stránka na některých počítačích zasekla na „Probíhá…" donekonečna, když systémové rozhraní Defenderu (WMI) neodpovědělo. Nově má každé čtení i každý zápis časový limit (několik sekund), takže stránka se vždycky dokončí a ukáže výsledek, i kdyby byl Defender zrovna zaneprázdněný. V záložce „Podrobný log" je teď vidět průběžně, co se právě zjišťuje.
 

@@ -205,42 +205,71 @@ public static class OchranyService
         return v == null ? (bool?)null : v != 0;
     }
 
-    // Zásady (GPO), které mohou držet Defender vypnutý i po zápisu přes WMI. Smažeme je, aby šel zase zapnout.
+    private static readonly string[] RtpHodnoty =
+        { "DisableRealtimeMonitoring", "DisableBehaviorMonitoring", "DisableOnAccessProtection",
+          "DisableScanOnRealtimeEnable", "DisableIOAVProtection" };
+
+    // Smaže všechno, co může držet Defender realtime vypnutý: jednak zásady (GPO), jednak skutečné
+    // nastavení Defenderu v registru. Oba klíče můžou být zamčené právy (ACL) – bereme best-effort.
     private static void VymazDefenderZasady()
     {
+        // Zásady (GPO)
         try
         {
             using var k = ZalohaService.Koren("HKLM").OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows Defender", true);
-            if (k == null) return;
-            foreach (var n in new[] { "DisableAntiSpyware", "DisableAntiVirus" })
-                if (k.GetValue(n) != null) k.DeleteValue(n, false);
-            using var rtp = k.OpenSubKey("Real-Time Protection", true);
+            if (k != null)
+            {
+                foreach (var n in new[] { "DisableAntiSpyware", "DisableAntiVirus" })
+                    if (k.GetValue(n) != null) k.DeleteValue(n, false);
+                using var rtp = k.OpenSubKey("Real-Time Protection", true);
+                if (rtp != null)
+                    foreach (var n in RtpHodnoty)
+                        if (rtp.GetValue(n) != null) rtp.DeleteValue(n, false);
+            }
+        }
+        catch { }
+
+        // Skutečné nastavení Defenderu (ne zásada) – klíč bývá zamčený ACL, zkoušíme vynulovat.
+        try
+        {
+            using var rtp = ZalohaService.Koren("HKLM")
+                .OpenSubKey(@"SOFTWARE\Microsoft\Windows Defender\Real-Time Protection", true);
             if (rtp != null)
-                foreach (var n in new[] { "DisableRealtimeMonitoring", "DisableBehaviorMonitoring",
-                                          "DisableOnAccessProtection", "DisableScanOnRealtimeEnable", "DisableIOAVProtection" })
-                    if (rtp.GetValue(n) != null) rtp.DeleteValue(n, false);
+                foreach (var n in RtpHodnoty)
+                    try { if (rtp.GetValue(n) != null) rtp.SetValue(n, 0, RegistryValueKind.DWord); } catch { }
         }
         catch { }
     }
 
-    // Zapnutí Defenderu v reálném čase bývá „líné" – WMI zápis projde bez chyby, ale stav se vrátí zpět.
-    // Proto nejdřív smažeme blokující zásady a pak zápis několikrát zopakujeme s krátkou prodlevou a ověřením.
-    private static void ZapniDefenderRealtime()
+    // Zapnutí Defenderu v reálném čase bývá „líné" – WMI zápis projde bez chyby, ale stav (MSFT_MpComputerStatus)
+    // se přepne až po pár sekundách, nebo vůbec. Postup: smazat blokující zásady i skutečné nastavení, zapsat
+    // SAMOTNÝ realtime (ať to neshodí jiná hodnota), počkat a teprve PAK ověřit – a to několikrát s delší prodlevou.
+    // Vrací true, když se realtime povedlo opravdu zapnout (čteno z MSFT_MpComputerStatus.RealTimeProtectionEnabled).
+    private static bool ZapniDefenderRealtime(IProgress<string>? l = null)
     {
         VymazDefenderZasady();
-        for (int pokus = 0; pokus < 3; pokus++)
+        var prodlevy = new[] { 1500, 3000, 4000 };
+        for (int pokus = 0; pokus < prodlevy.Length; pokus++)
         {
-            SetMp(p =>
+            try
             {
-                p["DisableRealtimeMonitoring"] = false;
-                p["DisableIOAVProtection"] = false;
-                p["DisableBehaviorMonitoring"] = false;
-                p["DisableScriptScanning"] = false;
-                p["PUAProtection"] = (byte)1;
-            });
-            if (DefenderZapnuty() == true) return;
-            System.Threading.Thread.Sleep(500);
+                SetMp(p =>
+                {
+                    p["DisableRealtimeMonitoring"] = false;
+                    p["DisableIOAVProtection"] = false;
+                    p["DisableBehaviorMonitoring"] = false;
+                    p["DisableScriptScanning"] = false;
+                    p["DisableOnAccessProtection"] = false;
+                });
+            }
+            catch (Exception ex) { l?.Report($"Pokus {pokus + 1}: zápis selhal – {Detail(ex)}"); }
+
+            l?.Report($"Pokus {pokus + 1}/{prodlevy.Length}: čekám {prodlevy[pokus] / 1000.0:0.#} s na přepnutí stavu…");
+            System.Threading.Thread.Sleep(prodlevy[pokus]);
+            if (DefenderZapnuty() == true) { l?.Report("Defender v reálném čase je zapnutý."); return true; }
         }
+        l?.Report("Defender v reálném čase se zapnout nepodařilo – i po smazání zásad a opakování zůstává vypnutý.");
+        return false;
     }
 
     /// <summary>Je nastavení spravované zásadou (GPO)? Pak ho aplikace nepřepíše.</summary>
@@ -297,8 +326,13 @@ public static class OchranyService
         Krok(diag, "SmartScreen pro aplikace (vypnout)",
             () => RegStr("HKLM", ExplorerKlic, "SmartScreenEnabled", "Off"), () => !SmartScreenZapnuty(), "registr Explorer\\SmartScreenEnabled");
 
-        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=0); ověříme jen výsledek.
-        Krok(diag, "Reputační blokování PUA (vypnout)", () => { }, () => PuaZapnuty() == false, "WMI PUAProtection");
+        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=0). Když ho systém nedovolí
+        // vypnout (drží si ho), NENÍ to chyba – PUA nebrání instalaci programu a klidně může zůstat zapnuté.
+        // Proto jen informativní řádek (Ok=true), ne chyba, ať to nestraší červeně.
+        diag.Add(PuaZapnuty() == false
+            ? new Polozka("Reputační blokování PUA (vypnout)", true, "OK – WMI PUAProtection")
+            : new Polozka("Reputační blokování PUA (vypnout)", true,
+                "Ponecháno zapnuté – systém ho nedovolil vypnout. Nevadí: PUA (reputace) nebrání instalaci programu."));
 
         UlozDiag("Vypnout", diag);
         return Shrnuti(diag, true);
@@ -310,9 +344,15 @@ public static class OchranyService
         var diag = new List<Polozka>();
 
         l.Report("Zapínám ochranu Defenderu v reálném čase…");
-        Krok(diag, "Defender v reálném čase + PUA (zapnout)",
-            ZapniDefenderRealtime,
-            () => DefenderZapnuty() == true, "WMI MSFT_MpPreference.Set (smazání zásad + opakování)");
+        if (DefenderZapnuty() == null)
+            diag.Add(new Polozka("Defender v reálném čase (zapnout)", true, "Defender na tomto PC není – přeskočeno."));
+        else if (ZapniDefenderRealtime(l))
+            diag.Add(new Polozka("Defender v reálném čase (zapnout)", true, "OK – WMI MSFT_MpPreference.Set (po smazání zásad a ověření stavu)"));
+        else
+            diag.Add(new Polozka("Defender v reálném čase (zapnout)", false,
+                "Zapsáno bez chyby, ale Windows realtime ochranu nezapnul ani po smazání zásad a opakovaných pokusech. "
+                + "Na tomto PC si stav drží sám systém. Zapni ho prosím ručně tlačítkem „Otevřít Zabezpečení Windows" níže "
+                + "(Ochrana před viry a hrozbami → Spravovat nastavení → Ochrana v reálném čase = Zapnuto), nebo pomůže restart PC."));
 
         l.Report("Zapínám cloudovou ochranu…");
         Krok(diag, "Cloudová ochrana (zapnout)",
@@ -337,8 +377,9 @@ public static class OchranyService
         Krok(diag, "SmartScreen pro aplikace (zapnout)",
             () => RegStr("HKLM", ExplorerKlic, "SmartScreenEnabled", "Warn"), () => SmartScreenZapnuty(), "registr Explorer\\SmartScreenEnabled");
 
-        // Reputační blokování PUA se nastavuje výše ve WMI kroku (PUAProtection=1); ověříme jen výsledek.
-        Krok(diag, "Reputační blokování PUA (zapnout)", () => { }, () => PuaZapnuty() == true, "WMI PUAProtection");
+        l.Report("Zapínám reputační blokování (PUA)…");
+        Krok(diag, "Reputační blokování PUA (zapnout)",
+            () => SetMp(p => p["PUAProtection"] = (byte)1), () => PuaZapnuty() == true, "WMI PUAProtection");
 
         Krok(diag, "SmartScreen pro aplikace z Microsoft Store (zapnout)",
             () => RegDword("HKCU", StoreKlic, StoreHodnota, 1),
@@ -377,6 +418,21 @@ public static class OchranyService
         catch (Exception ex)
         {
             return Task.FromResult("Nepodařilo se zkopírovat: " + Detail(ex));
+        }
+    }
+
+    // Otevře Zabezpečení Windows na stránce Ochrana před viry a hrozbami. Spouští se přes ShellExecute
+    // (protokol windowsdefender://), ne CreateProcess – funguje i tam, kde je blokované spouštění .exe.
+    private static Task<string> OtevritZabezpeceni(IProgress<string> l, CancellationToken c)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("windowsdefender://threat") { UseShellExecute = true });
+            return Task.FromResult("Otevřeno Zabezpečení Windows. Jdi na „Ochrana před viry a hrozbami → Spravovat nastavení" a zapni „Ochrana v reálném čase".");
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult("Nepodařilo se otevřít Zabezpečení Windows (" + Detail(ex) + "). Otevři ho ručně: Start → napiš „Zabezpečení Windows".");
         }
     }
 
@@ -423,6 +479,7 @@ public static class OchranyService
                         "Mezitím stahujte a instalujte jen soubory, kterým věříte.\n\nOpravdu vypnout ochrany?"
         });
         z.HromadneAkce.Add(new AkceRadku("Znovu zapnout všechny ochrany", ZapnoutVse) { Doporucena = true });
+        z.HromadneAkce.Add(new AkceRadku("Otevřít Zabezpečení Windows", OtevritZabezpeceni));
         if (_diag.Count > 0)
             z.HromadneAkce.Add(new AkceRadku("Zkopírovat diagnostiku", ZkopirovatDiagnostiku));
 
