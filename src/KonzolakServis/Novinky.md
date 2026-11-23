@@ -1,3 +1,7 @@
+## 0.28
+- **Spolehlivé vypínání programů po spuštění** (Optimalizace → Programy po spuštění). Dřív šlo dát „Vypnout", ale položka zůstala zapnutá – na některých počítačích totiž samotný způsob jako ve Správci úloh (klíč StartupApproved) nic neudělá. Nově se program při vypnutí opravdu odebere z autostartu (hodnota se zálohuje, takže „Zapnout" ji kdykoli vrátí zpět) a po akci se stav ověří. Když vypnutí neprojde, aplikace ukáže přesnou chybu místo tichého „nic se nestalo".
+- Seznam se po zapnutí/vypnutí už nepřeskládává, takže je hned vidět, že se stav změnil.
+
 ## 0.27
 - Oprava instalátoru: na konci instalace hlásil „CreateProcess selhala; kód 740 – vyžaduje zvýšená oprávnění" a aplikaci nespustil. Aplikace vyžaduje práva správce, a instalátor ji na dokončovací stránce spouštěl neelevovaně. Nově se spouští přes ShellExecute, takže se korektně vyžádá oprávnění a aplikace naběhne. (Tiché automatické aktualizace uvnitř aplikace fungují beze změny.)
 

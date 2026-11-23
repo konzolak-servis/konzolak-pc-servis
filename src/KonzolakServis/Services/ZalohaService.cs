@@ -43,6 +43,12 @@ public static class ZalohaService
         lock (Zamek) { var d = Nacti(); if (d.Remove(klic)) Uloz(d); }
     }
 
+    /// <summary>Všechny zapamatované hodnoty, jejichž klíč začíná daným prefixem.</summary>
+    public static List<KeyValuePair<string, string>> SPrefixem(string prefix)
+    {
+        lock (Zamek) return Nacti().Where(kv => kv.Key.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+    }
+
     // ---------- registr ----------
 
     public static RegistryKey Koren(string hive) => hive == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
