@@ -1,3 +1,7 @@
+## 0.29
+- **Index spolehlivosti a pády teď událostem rozumí.** Dřív to byl jen surový výpis z logu Windows. Nově se události za 7 dní seskupí, česky vysvětlí (co to je, jak je to vážné, co s tím) a nahoře je shrnutí „co řešit / co je jen šum". Neškodné hlášky (DCOM, aktualizace Googlu/Chrome, CAPI2, krátké výpadky služeb…) jsou označené jako nevýznamné a schované do sbalené sekce.
+- Restart Microsoft Defenderu (MsMpEng) se správně vyhodnotí jako neškodný – stává se hlavně po změně ochrany v reálném čase (i po „Dočasně vypnout ochrany") a Defender sám naběhne zpět. Naše vypínání/zapínání ochran ho nijak nerozbíjí, používá jen oficiální rozhraní Windows.
+
 ## 0.28
 - **Spolehlivé vypínání programů po spuštění** (Optimalizace → Programy po spuštění). Dřív šlo dát „Vypnout", ale položka zůstala zapnutá – na některých počítačích totiž samotný způsob jako ve Správci úloh (klíč StartupApproved) nic neudělá. Nově se program při vypnutí opravdu odebere z autostartu (hodnota se zálohuje, takže „Zapnout" ji kdykoli vrátí zpět) a po akci se stav ověří. Když vypnutí neprojde, aplikace ukáže přesnou chybu místo tichého „nic se nestalo".
 - Seznam se po zapnutí/vypnutí už nepřeskládává, takže je hned vidět, že se stav změnil.

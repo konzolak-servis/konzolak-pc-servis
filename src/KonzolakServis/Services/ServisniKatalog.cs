@@ -28,11 +28,8 @@ public static class ServisniKatalog
             }},
         new() {
             Nazev = "Index spolehlivosti a pády", Kategorie = Kategorie.Diagnostika,
-            Popis = "Kritické události za posledních 7 dní (pády aplikací, BSOD, chyby ovladačů).",
-            Spustit = async (log, ct) => Z(await ProcessRunner.PowerShellAsync(
-                "Get-WinEvent -FilterHashtable @{LogName='System','Application';Level=1,2;StartTime=(Get-Date).AddDays(-7)} -MaxEvents 40 " +
-                "| ForEach-Object { '{0:dd.MM. HH:mm}  {1}  {2}' -f $_.TimeCreated,$_.ProviderName,($_.Message -split \"`n\")[0] }",
-                log, ct), "Výpis událostí hotov", "Události nelze načíst") },
+            Popis = "Kritické události za 7 dní srozumitelně: seskupí je, vysvětlí, řekne jak jsou vážné a co řešit – a co je jen běžný šum.",
+            Spustit = async (log, ct) => Vysl(await SpolehlivostService.ZpravaAsync(log, ct)) },
         new() {
             Nazev = "Zpráva o baterii", Kategorie = Kategorie.Diagnostika,
             Popis = "U notebooků: zdraví baterie, kapacita a počet cyklů.",
