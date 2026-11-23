@@ -72,6 +72,11 @@ public static class ServisniKatalog
             Spustit = (log, _) => Task.FromResult(Vysl(Views.HesloOkno.Zmenit())) },
 
         new() {
+            Nazev = "Zámek heslem při spuštění (zapnout/vypnout)", Kategorie = Kategorie.Nastroje,
+            Popis = "Zapne nebo vypne, jestli se aplikace spouští na heslo. Výchozí heslo je ve veřejném zdrojáku slabé – buď si nastav vlastní, nebo zámek vypni.",
+            Spustit = (log, ct) => Task.Run(() => Vysl(ZamekZprava()), ct) },
+
+        new() {
             Nazev = "Benchmark PC", Kategorie = Kategorie.Diagnostika,
             Popis = "Výkon procesoru (1 jádro / všechna), paměti, grafiky a disku. Skóre, porovnání s obvyklými výsledky a historie testů.",
             Spustit = BenchmarkPcService.SpustAsync },
@@ -187,6 +192,41 @@ public static class ServisniKatalog
             Popis = "Systém, procesor, paměť, deska, BIOS, grafika, disky, volné místo, síť.",
             Spustit = (log, _) => HardwareInfoService.ZpravaAsync(log) },
     }.Concat(NastrojeService.Vse()).ToList();
+
+    /// <summary>Stránka pro zapnutí/vypnutí zámku heslem při spuštění.</summary>
+    private static Zprava ZamekZprava()
+    {
+        var aktivni = HesloService.ZamekAktivni;
+        var z = new Zprava("Zámek heslem při spuštění") { Obnovit = (l, c) => Task.Run(() => ZamekZprava(), c) };
+        z.Stav = aktivni ? Stav.Ok : Stav.Varovani;
+        z.Shrnuti = aktivni
+            ? "Zámek je ZAPNUTÝ – aplikace se spouští na heslo."
+            : "Zámek je VYPNUTÝ – aplikace se spustí bez hesla.";
+
+        if (aktivni)
+            z.HromadneAkce.Add(new AkceRadku("Vypnout zámek heslem",
+                (l, c) => Task.Run(() =>
+                {
+                    try { HesloService.NastavZamek(false); return "Zámek vypnut – od příštího spuštění se heslo nevyžaduje."; }
+                    catch (Exception ex) { return "Nepodařilo se vypnout (potřeba správce?): " + ex.Message; }
+                }, c))
+            { Potvrzeni = "Opravdu vypnout zámek? Aplikace pak půjde spustit bez hesla – zajistěte si jinou ochranu." });
+        else
+            z.HromadneAkce.Add(new AkceRadku("Zapnout zámek heslem",
+                (l, c) => Task.Run(() =>
+                {
+                    try { HesloService.NastavZamek(true); return "Zámek zapnut – od příštího spuštění se bude vyžadovat heslo."; }
+                    catch (Exception ex) { return "Nepodařilo se zapnout (potřeba správce?): " + ex.Message; }
+                }, c))
+            { Doporucena = true });
+
+        var s = z.PridejSekci("Stav");
+        s.Pridej("Zámek heslem při spuštění", aktivni ? "zapnutý" : "VYPNUTÝ", aktivni ? Stav.Ok : Stav.Varovani,
+            "Změna platí od příštího spuštění aplikace. Uloží se jen do tohoto počítače (HKLM).");
+        s.Pridej("Vlastní heslo", "Nástroje → Změnit heslo pro spuštění", Stav.Info,
+            "Výchozí heslo je ve veřejném zdrojovém kódu, takže je slabé. Pokud zámek necháš zapnutý, nastav si vlastní heslo.");
+        return z;
+    }
 
     private static long SmazObsah(string dir, IProgress<string> log, CancellationToken ct)
     {

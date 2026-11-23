@@ -1,3 +1,7 @@
+## 0.21
+- Ochrany: u každé položky (vzorky, firewall, SmartScreen, Defender) se teď po akci ověří, jestli se změna opravdu zapsala, a když ne, ukáže se přesná příčina (typ a kód chyby, nebo že hodnotu vrátila zpět zásada / Ochrana proti neoprávněným změnám). Přibyla sekce „Diagnostika poslední akce" a tlačítko „Zkopírovat diagnostiku", takže z jednoho výpisu je vidět, co přesně a proč selhalo.
+- Nástroje → „Zámek heslem při spuštění (zapnout/vypnout)": lze vypnout spouštění na heslo (výchozí heslo je ve veřejném zdrojáku slabé) a zase zapnout. Nastavení platí od příštího spuštění.
+
 ## 0.20
 - Oprava: vypínání a zapínání ochran na některých počítačích hlásilo „Přístup byl odepřen" (nešlo spustit powershell.exe). Nově aplikace nic nespouští – všechno nastavuje přímo (Defender přes systémové rozhraní WMI, firewall přes jeho rozhraní, SmartScreen přes registr). Mělo by to teď fungovat i tam, kde je spouštění skriptů zablokované.
 - Když aplikace neběží jako správce, místo nejasné chyby to rovnou napíše a poradí spustit ji jako správce. U každé ochrany, kterou se nepodaří přepnout (např. kvůli Ochraně proti neoprávněným změnám), se ukáže srozumitelný důvod.
