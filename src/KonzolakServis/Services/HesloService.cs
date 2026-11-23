@@ -17,6 +17,28 @@ public static class HesloService
 
     private const string Klic = @"SOFTWARE\Konzolak Servis";
     private const string Hodnota = "HesloHash";
+    private const string ZamekHodnota = "ZamekVypnut"; // DWORD 1 = zámek heslem při spuštění je vypnutý
+
+    /// <summary>Má se při spuštění vyžadovat heslo? (výchozí ano; dá se vypnout v Nástrojích)</summary>
+    public static bool ZamekAktivni
+    {
+        get
+        {
+            try
+            {
+                using var k = Registry.LocalMachine.OpenSubKey(Klic);
+                return (k?.GetValue(ZamekHodnota) as int?) != 1;
+            }
+            catch { return true; }
+        }
+    }
+
+    /// <summary>Zapne/vypne zámek heslem při spuštění (uloží do HKLM). Vyžaduje práva správce.</summary>
+    public static void NastavZamek(bool zapnout)
+    {
+        using var k = Registry.LocalMachine.CreateSubKey(Klic, true);
+        k.SetValue(ZamekHodnota, zapnout ? 0 : 1, RegistryValueKind.DWord);
+    }
 
     private static string Hash(string heslo) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(heslo))).ToLowerInvariant();

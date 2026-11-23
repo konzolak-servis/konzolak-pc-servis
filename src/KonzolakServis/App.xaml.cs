@@ -20,7 +20,7 @@ public partial class App : Application
         // Po dobu dialogu hesla není otevřené žádné hlavní okno; bez OnExplicitShutdown by se aplikace
         // po zavření dialogu sama ukončila (OnLastWindowClose) a hlavní okno by se vůbec neotevřelo.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        if (!HesloOkno.Overit())
+        if (Services.HesloService.ZamekAktivni && !HesloOkno.Overit())
         {
             Shutdown();
             return;
