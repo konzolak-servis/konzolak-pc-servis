@@ -351,7 +351,7 @@ public static class OchranyService
         else
             diag.Add(new Polozka("Defender v reálném čase (zapnout)", false,
                 "Zapsáno bez chyby, ale Windows realtime ochranu nezapnul ani po smazání zásad a opakovaných pokusech. "
-                + "Na tomto PC si stav drží sám systém. Zapni ho prosím ručně tlačítkem „Otevřít Zabezpečení Windows" níže "
+                + "Na tomto PC si stav drží sám systém. Zapni ho prosím ručně tlačítkem „Otevřít Zabezpečení Windows“ níže "
                 + "(Ochrana před viry a hrozbami → Spravovat nastavení → Ochrana v reálném čase = Zapnuto), nebo pomůže restart PC."));
 
         l.Report("Zapínám cloudovou ochranu…");
@@ -428,11 +428,11 @@ public static class OchranyService
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("windowsdefender://threat") { UseShellExecute = true });
-            return Task.FromResult("Otevřeno Zabezpečení Windows. Jdi na „Ochrana před viry a hrozbami → Spravovat nastavení" a zapni „Ochrana v reálném čase".");
+            return Task.FromResult("Otevřeno Zabezpečení Windows. Jdi na „Ochrana před viry a hrozbami → Spravovat nastavení“ a zapni „Ochrana v reálném čase“.");
         }
         catch (Exception ex)
         {
-            return Task.FromResult("Nepodařilo se otevřít Zabezpečení Windows (" + Detail(ex) + "). Otevři ho ručně: Start → napiš „Zabezpečení Windows".");
+            return Task.FromResult("Nepodařilo se otevřít Zabezpečení Windows (" + Detail(ex) + "). Otevři ho ručně: Start → napiš „Zabezpečení Windows“.");
         }
     }
 
