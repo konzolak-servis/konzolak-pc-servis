@@ -1,3 +1,6 @@
+## 0.26
+- Vypínání ochrany v reálném čase je teď spolehlivé i tam, kde Windows přepíná stav se zpožděním: po zápisu se počká a ověří skutečný stav, a pokud nenaskočí, pokus se zopakuje. Dřív „Vypnout" občas nahlásilo chybu, i když se vypnutí za chvíli projevilo. Když Windows vypnutí vůbec nedovolí, aplikace to napíše a nabídne tlačítko „Otevřít Zabezpečení Windows" k ručnímu vypnutí.
+
 ## 0.25
 - Nově je aplikace jako **klasický instalátor** (místo portable .exe): nainstaluje se do Program Files, udělá zástupce na ploše i v nabídce Start a jde normálně odinstalovat přes Přidat/Odebrat programy. Ikona i název zůstávají stejné.
 - **Aktualizace se už samy přepíšou** – není potřeba ručně mazat starou verzi. Aplikace stáhne nový instalátor, tiše ho na pozadí spustí a sama se restartuje do nové verze.
